@@ -38,3 +38,6 @@ __pycache__/
 /artifacts/
 # Firmware host-test binary
 /firmware/tests/fw_tests
+
+# local VS Code settings (repo root)
+/.vscode/
