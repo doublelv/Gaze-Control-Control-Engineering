@@ -1,3 +1,4 @@
 # docs/control-theory
 
-Add plant models, assumptions, units, equations, identification evidence, controller design, stability analysis, simulations, and tuning rationale. Gains and sample periods remain TBD.
+`control_design.md`: plant model, PID pole placement and margins, reference generation for the
+3 axes, Kalman filter, servo model, identification and gaze mapping, with the simulated results.

@@ -1,3 +1,5 @@
 # docs/requirements
 
-Add stable requirement IDs, scope, priority, measurable acceptance criteria, and verification methods. Agree accuracy, latency, operating conditions, and fault expectations before assigning values.
+`requirements.md`: functional, performance and safety requirements with IDs, acceptance
+criteria and how each is verified (simulation now, hardware later). Hardware results go in a
+new column / file when the rig is built. They are never merged with the simulation results.

@@ -1,3 +1,7 @@
 # .github/workflows
 
-Add real YAML workflows only after build/test commands and dependencies are known. Plan MATLAB, firmware, and shared interface checks. Document MATLAB licensing/runner requirements, toolchain versions, permissions, and artifacts. This README creates no active workflow; CI is not configured.
+`ci.yml` runs on every push and pull request:
+- `firmware`: `make -C firmware/tests` (gcc host tests + BSP syntax check).
+- `matlab-octave`: `matlab/tests/run_all_tests` in GNU Octave (no MATLAB licence needed; synthetic
+  data only, takes ~4 min).
+No hardware is used in CI.

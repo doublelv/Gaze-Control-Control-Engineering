@@ -1,0 +1,19 @@
+# Offline checks on every push / pull request (no hardware).
+name: ci
+on: [push, pull_request]
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Firmware host tests (protocol vectors, app logic, BSP syntax)
+        run: make -C firmware/tests
+  matlab-octave:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GNU Octave
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends octave
+      - name: MATLAB tests in Octave
+        working-directory: matlab/tests
+        run: octave-cli --eval "set(0,'DefaultFigureVisible','off'); run_all_tests"

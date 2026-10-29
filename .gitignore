@@ -36,3 +36,5 @@ __pycache__/
 /matlab/data/local/
 /matlab/config/local/
 /artifacts/
+# Firmware host-test binary
+/firmware/tests/fw_tests
