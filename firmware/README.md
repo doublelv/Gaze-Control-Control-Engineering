@@ -15,7 +15,7 @@ and enforces the safety rules by itself. Protocol: `interface/protocol.md` (v1).
 | `App/config.h` | PWM counts, servo limits, watchdog time, endstop and direction settings **[CHECK]** |
 | `App/bsp.h` | Hardware interface used by the modules |
 | `App/bsp/bsp_stm32h7.c` | BSP with the STM32 HAL (compiled only in the CubeMX project) |
-| `Core/`, `Drivers/` | Reserved for the CubeMX-generated project (not committed yet) |
+| `firmware.ioc`, `Core/`, `Drivers/`, `cmake/` | CubeMX-generated project (CMake). `main.c` calls `bsp_start()`, `app_init()`, `app_poll()` in USER CODE sections |
 | `tests/` | Host unit tests (gcc), incl. the shared protocol vectors |
 
 ## Host tests (no board needed)
@@ -41,6 +41,27 @@ make            # builds and runs 53 checks + syntax-checks the STM32 BSP agains
 | IR LED 1..4 (470R -> NPN base) | GPIO_Output | push-pull, low at reset | `LED_1` .. `LED_4` |
 | Endstop at the MIN end | GPIO_Input | no pull (module has its own resistor) | `END_MIN` |
 | ST-LINK virtual COM port | **USART3** | Asynchronous, 921600 baud, 8N1, NVIC USART3 global interrupt **enabled** | - |
+
+### Pin assignment in `firmware.ioc` (Zio connector, give this to whoever wires J10)
+
+| Signal | Pin | Board label |
+|---|---|---|
+| Motor PWM (TIM1_CH1) | PE9 | D6 |
+| Motor DIR | PF13 | D7 |
+| Encoder A (TIM2_CH1) | PA5 | D13 |
+| Encoder B (TIM2_CH2) | PB3 | D23 |
+| Servo 1 (TIM3_CH1) | PC6 | D16 |
+| Servo 2 (TIM3_CH2) | PC7 | D21 |
+| IR LED 1..4 | PF12, PD15, PD14, PE13 | D8, D9, D10, D3 |
+| Endstop MIN | PF15 | D2 |
+| USART3 (ST-LINK VCP) | PD8 / PD9 | on board |
+
+Clock: SYSCLK 480 MHz (PLL from HSI, voltage scale 0), APB1/APB2 timer clocks 240 MHz.
+
+### Build and flash
+- VS Code + STM32 extension: open the `firmware/` folder, configure preset `Debug`, build, flash.
+- Command line: `cmake --preset Debug && cmake --build --preset Debug` (needs arm-none-eabi-gcc, CMake, Ninja),
+  then flash `build/Debug/firmware.elf` with STM32CubeProgrammer.
 
 4. Generate code. Add `App/` to the project (right-click project -> Properties -> C/C++ General -> Paths and Symbols:
    add `../App` and subfolders to Includes and **Source Location**), or copy `App/` into the project root.
