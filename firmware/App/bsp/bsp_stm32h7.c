@@ -1,7 +1,7 @@
 /*
  * bsp_stm32h7.c - BSP for NUCLEO-H753ZI using the STM32 HAL.
  * Requires a CubeMX project with (see firmware/README.md):
- *   TIM1 CH1  PWM 20 kHz (ARR = MOTOR_PWM_COUNTS-1)  -> MDD10A PWM1
+ *   TIM4 CH3  PWM 20 kHz (ARR = MOTOR_PWM_COUNTS-1)  -> MDD10A PWM1 (PB8, CN7 D15)
  *   TIM2      encoder mode TI1+TI2, 32-bit            -> FIT0186 A/B
  *   TIM3 CH1/CH2 PWM 50 Hz, 1 MHz tick                -> servo A/B
  *   USART3    921600 8N1, RX interrupt                -> ST-LINK VCP
@@ -14,7 +14,11 @@
 #include "../app.h"
 #include "../config.h"
 
-extern TIM_HandleTypeDef  htim1, htim2, htim3;
+extern TIM_HandleTypeDef  htim2, htim3, htim4;
+
+/* motor PWM timer/channel: must match firmware.ioc */
+#define MOTOR_HTIM   htim4
+#define MOTOR_CH     TIM_CHANNEL_3
 extern UART_HandleTypeDef huart3;
 
 static uint8_t rx_byte;
@@ -29,7 +33,7 @@ void bsp_start(void)
 
     HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
     __HAL_TIM_SET_COUNTER(&htim2, 0);
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+    HAL_TIM_PWM_Start(&MOTOR_HTIM, MOTOR_CH);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
     HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
@@ -38,7 +42,7 @@ void bsp_start(void)
 void bsp_motor_write(uint32_t compare, bool positive)
 {
     HAL_GPIO_WritePin(MOTOR_DIR_GPIO_Port, MOTOR_DIR_Pin, positive ? GPIO_PIN_SET : GPIO_PIN_RESET);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, compare);
+    __HAL_TIM_SET_COMPARE(&MOTOR_HTIM, MOTOR_CH, compare);
 }
 
 void bsp_servo_write(uint8_t channel, uint16_t pulse_us)

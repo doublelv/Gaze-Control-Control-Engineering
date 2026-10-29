@@ -118,6 +118,8 @@ P.led.halfAngleDeg = 17.5;
 P.led.If  = 0.050; P.led.VfTyp = 1.5; P.led.VfMax = 2.2;  % VfTyp [CHECK]
 P.led.Rser = 68;  P.led.Prated = 0.25;                     % Yageo MFR-25 68R
 P.led.n    = 4;    % schematic: 4 IR LEDs, each 68R + NPN switch (470R base, 10k pull-down)
+%   LED i = J10 'IR LED i' = Nucleo LED_i (PF3, PD15, PD14, PA4) = schematic D(5-i)
+%   (J10 'IR LED 1' drives D4 ... 'IR LED 4' drives D1). See docs/hardware/hardware.md.
 P.led.on   = [1 1 1 1];  % which LEDs to switch on while tracking
 %  Position of each LED relative to the camera, on the carriage [m]   [CHECK WITH THE BUILD]
 %  LED 1, 2: on the servos (tilt toward the eyes). LED 3, 4: fixed next to the camera.

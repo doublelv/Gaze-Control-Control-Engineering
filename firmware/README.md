@@ -33,7 +33,7 @@ make            # builds and runs 53 checks + syntax-checks the STM32 BSP agains
 
 | Schematic J10 signal | CubeMX | Settings | User label |
 |---|---|---|---|
-| Motor 1 PWM -> MDD10A PWM1 | **TIM1 CH1** | PWM Generation CH1, Prescaler 0, Counter Period 11999 | - |
+| Motor 1 PWM -> MDD10A PWM1 | **TIM4 CH3** | PWM Generation CH3, Prescaler 0, Counter Period 11999 | - |
 | Motor 1 DIR -> MDD10A DIR1 | GPIO_Output | | `MOTOR_DIR` |
 | Encoder A (J10 pin 15, labelled "Encoder B" on the schematic) | **TIM2 CH1** | Combined Channels: Encoder Mode TI1 and TI2, Counter Period 0xFFFFFFFF, Input filter 6 | - |
 | Encoder B | **TIM2 CH2** | (same timer) | - |
@@ -42,19 +42,31 @@ make            # builds and runs 53 checks + syntax-checks the STM32 BSP agains
 | Endstop at the MIN end | GPIO_Input | no pull (module has its own resistor) | `END_MIN` |
 | ST-LINK virtual COM port | **USART3** | Asynchronous, 921600 baud, 8N1, NVIC USART3 global interrupt **enabled** | - |
 
-### Pin assignment in `firmware.ioc` (Zio connector, give this to whoever wires J10)
+### Pin assignment in `firmware.ioc` (all signals on Zio CN7, power from CN8: no soldering)
 
-| Signal | Pin | Board label |
-|---|---|---|
-| Motor PWM (TIM1_CH1) | PE9 | D6 |
-| Motor DIR | PF13 | D7 |
-| Encoder A (TIM2_CH1) | PA5 | D13 |
-| Encoder B (TIM2_CH2) | PB3 | D23 |
-| Servo 1 (TIM3_CH1) | PC6 | D16 |
-| Servo 2 (TIM3_CH2) | PC7 | D21 |
-| IR LED 1..4 | PF12, PD15, PD14, PE13 | D8, D9, D10, D3 |
-| Endstop MIN | PF15 | D2 |
-| USART3 (ST-LINK VCP) | PD8 / PD9 | on board |
+CN7 (20-pin, odd pins = left column, even = right column, pin 1 at the top; checked against the
+ST NUCLEO-H753ZI (MB1364E) Zio pinout picture: D8 is PF3 on this board, not PF12):
+
+| CN7 pin | Board label | MCU pin | Signal |
+|---|---|---|---|
+| 1 | D16 | PC6 | Servo 1 (TIM3_CH1) |
+| 2 | D15 | PB8 | Motor PWM -> MDD10A PWM1 (TIM4_CH3) |
+| 4 | D14 | PB9 | Motor DIR -> MDD10A DIR1 (`MOTOR_DIR`) |
+| 7 | D19 | PB12 | Endstop MIN signal (`END_MIN`) |
+| 8 | GND | GND | Common ground (MDD10A GND, LED/servo 5 V supply GND) |
+| 10 | D13 | PA5 | Encoder A (TIM2_CH1) |
+| 11 | D21 | PC7 | Servo 2 (TIM3_CH2) |
+| 15 | D23 | PB3 | Encoder B (TIM2_CH2) |
+| 16 | D10 | PD14 | IR LED 3 (`LED_3`) |
+| 17 | D24 | PA4 | IR LED 4 (`LED_4`) |
+| 18 | D9 | PD15 | IR LED 2 (`LED_2`) |
+| 20 | D8 | PF3 | IR LED 1 (`LED_1`) |
+
+Unused on CN7: 3 (PB15), 5 (PB13, Ethernet), 6 (VREF), 9 (PA15), 12 (PA6), 13 and 14 (both PB5), 19 (PB4).
+
+CN8 (power only): pin 7 = 3V3 (encoder VCC, endstop +), pin 9 = 5V, pins 11/13 = GND.
+Servos and IR LEDs are powered from the buck 5 V, not from the Nucleo; only their GND is shared.
+USART3 (PD8/PD9) goes to the ST-LINK USB, no wire needed.
 
 Clock: SYSCLK 480 MHz (PLL from HSI, voltage scale 0), APB1/APB2 timer clocks 240 MHz.
 

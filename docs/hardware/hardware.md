@@ -16,17 +16,32 @@
 | Creality endstop (1 piece) | homing at the MIN end | |
 | Waveshare OV9281 USB camera (A) | eye camera | mono, no IR filter, global shutter, 1280x720 @ 120 fps (MJPG), 1.65 mm lens, 105 deg FOV |
 
-## Wiring (team schematic, J10 = Nucleo connector numbering, not the real pin names)
-| J10 | Signal | Nucleo peripheral | Notes |
-|---|---|---|---|
-| 5, 6 | Servo 1, 2 signal | TIM3 CH1, CH2 | servos powered from the **buck 5 V**, common GND |
-| 13 | Motor PWM -> MDD10A PWM1 | TIM1 CH1 | |
-| 14 | Motor DIR -> MDD10A DIR1 | GPIO `MOTOR_DIR` | |
-| 15, 16 | Encoder A, B ("Encoder B" on pin 15 is a label typo) | TIM2 CH1, CH2 | encoder VCC 3.3 V |
-| 17-20 | IR LED 1-4 | GPIO `LED_1..4` | 470 Ω -> NPN base |
-| (add) | Endstop signal | GPIO `END_MIN` | 3.3 V / GND |
-| USB | ST-LINK | USART3 921600 8N1 | to the laptop |
-**Pins: TBD.** Choose physical pins with the listed timer functions in CubeMX (`firmware/README.md`).
+## Wiring (team schematic J10 -> NUCLEO-H753ZI, jumper wires on Zio CN7/CN8, no soldering)
+| J10 | Schematic signal | Goes to | Nucleo pin | Header |
+|---|---|---|---|---|
+| 1 | USB | laptop | ST-LINK USB (USART3 921600 8N1 inside) | USB cable |
+| 2 | +5VDC | IR LED anodes via 68 Ω | 5V | CN8 pin 9 |
+| 3 | +3V3 | encoder VCC (J5-4) | 3V3 | CN8 pin 7 |
+| 4 | GND | common ground (MDD10A, buck, encoder) | GND | CN8 pin 11 or CN7 row 4 right |
+| 5 | Servo 1 signal | J1-2 | PC6, TIM3_CH1 | CN7 row 1 left |
+| 6 | Servo 2 signal | J3-2 | PC7, TIM3_CH2 | CN7 row 6 left |
+| 7-12 | not connected | | | |
+| 13 | Motor 1 PWM | MDD10A PWM1 (J2-4) | PB8, TIM4_CH3, 20 kHz | CN7 row 1 right (D15) |
+| 14 | Motor 1 DIR | MDD10A DIR1 (J2-5) | PB9, `MOTOR_DIR` | CN7 row 2 right (D14) |
+| 15 | "Encoder B" (wire goes to ENCODER A, J5-5) | encoder A | PA5, TIM2_CH1 | CN7 row 5 right (D13) |
+| 16 | "Encoder 3 B" (wire goes to ENCODER B, J5-6) | encoder B | PB3, TIM2_CH2 | CN7 row 8 left |
+| 17 | IR LED 1 | R8 -> Q4 -> LED **D4** | PF3, `LED_1` | CN7 row 10 right (D8) |
+| 18 | IR LED 2 | R7 -> Q3 -> LED **D3** | PD15, `LED_2` | CN7 row 9 right (D9) |
+| 19 | IR LED 3 | R6 -> Q2 -> LED **D2** | PD14, `LED_3` | CN7 row 8 right (D10) |
+| 20 | IR LED 4 | R5 -> Q1 -> LED **D1** | PA4, `LED_4` | CN7 row 9 left |
+| (add) | Endstop S / + / - | Creality endstop, MIN end | PB12 `END_MIN` / IOREF 3.3 V / GND | CN7 row 4 left / CN8 pin 3 / CN8 pin 13 |
+
+Notes:
+- "IR LED i" in software (ledMask bit i-1, `P.led` column i) = J10 "IR LED i", which drives schematic LED D(5-i).
+  `P.led.servo` must name the LEDs that are physically on servo 1 and servo 2.
+- Servo power (J1-1, J3-1) comes from the buck 5 V; motor power is the 12 V supply. Only GND is shared with the Nucleo.
+- The endstop is not in the schematic yet: add it (3 wires).
+- Unused CN7 pins: PB15, PB13 (Ethernet), VREFP, PA15, PA6, PB5 (twice), PB4.
 
 ## Power budget
 | Load | Supply | Current |

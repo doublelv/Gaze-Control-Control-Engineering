@@ -8,7 +8,7 @@
 #define FW_VERSION_MAJOR      1u
 #define FW_VERSION_MINOR      0u
 
-/* Motor PWM: TIM1 CH1, 240 MHz timer clock / 20 kHz -> ARR = 11999       [CHECK] */
+/* Motor PWM: TIM4 CH3 (PB8), 240 MHz timer clock / 20 kHz -> ARR = 11999       */
 #define MOTOR_PWM_COUNTS      12000
 /* Servo PWM: TIM3 CH1/CH2, 1 MHz tick, 50 Hz -> compare value = pulse in us */
 #define SERVO_MIN_US          500u

@@ -12,7 +12,7 @@
                           │                                                      │
  NUCLEO-H753ZI <──USB (ST-LINK VCP, 921600 8N1)── communication (protocol v1) <──┘
    │  firmware = I/O bridge + safety (watchdog, endstop gating)
-   ├─ TIM1 PWM + DIR ─> MDD10A ─> FIT0186 motor ─> GT2 belt ─> camera carriage
+   ├─ TIM4 PWM + DIR ─> MDD10A ─> FIT0186 motor ─> GT2 belt ─> camera carriage
    ├─ TIM2 encoder  <─ FIT0186 encoder
    ├─ TIM3 PWM x2   ─> SER0006 servos (tilt of LED 1, 2)
    ├─ GPIO x4       ─> NPN ─> IR LEDs 1-4

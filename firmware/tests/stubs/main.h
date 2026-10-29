@@ -7,6 +7,7 @@ typedef enum { GPIO_PIN_RESET = 0, GPIO_PIN_SET = 1 } GPIO_PinState;
 #define USART3 1
 #define TIM_CHANNEL_1 0x0u
 #define TIM_CHANNEL_2 0x4u
+#define TIM_CHANNEL_3 0x8u
 #define TIM_CHANNEL_ALL 0x3Cu
 extern struct { uint32_t DEMCR; } *CoreDebug;
 extern struct { uint32_t LAR, CYCCNT, CTRL; } *DWT;
