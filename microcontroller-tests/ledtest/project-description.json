@@ -6,6 +6,7 @@
       "type": "Executable",
       "output_filename": "ledtest",
       "mcu": "STM32H753ZIT6",
+      "board": "NUCLEO-H753ZI",
       "toolchain_type": "GCC",
       "toolchain_prefix": "",
       "sources": [
@@ -118,6 +119,7 @@
       "type": "Executable",
       "output_filename": "ledtest",
       "mcu": "STM32H753ZIT6",
+      "board": "NUCLEO-H753ZI",
       "toolchain_type": "GCC",
       "toolchain_prefix": "",
       "sources": [
@@ -218,7 +220,7 @@
     }
   ],
   "source_ide": "Empty",
-  "path": "C:\\Users\\Kaloyan\\AppData\\Local\\Temp\\stm32cube_for_vscode_empty_project_icOR6R",
+  "path": "C:\\Users\\Kaloyan\\AppData\\Local\\Temp\\stm32cube_for_vscode_empty_project_BpHRdX",
   "languages": [
     "CPP",
     "C"
