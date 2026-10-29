@@ -1,0 +1,38 @@
+# OS/editor temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+*.swp
+*.swo
+# MATLAB generated files; retain source and deliberate fixtures
+*.asv
+*.m~
+slprj/
+*.slxc
+codegen/
+# Firmware build output; retain project metadata and linker scripts
+firmware/**/Debug/
+firmware/**/Release/
+firmware/**/build/
+*.o
+*.obj
+*.d
+*.elf
+*.axf
+*.hex
+*.bin
+*.map
+*.su
+# Local secrets/environments
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+# Explicit locations for private/generated data
+/data/local/
+/matlab/data/local/
+/matlab/config/local/
+/artifacts/
