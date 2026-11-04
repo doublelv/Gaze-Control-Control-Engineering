@@ -54,7 +54,7 @@ mot.L    = 1.0e-3;                  % [H]          [PLACEHOLDER - measure with L
 mot.Jm   = 1.5e-6;                  % rotor inertia [kg m^2] [PLACEHOLDER - identify, see sysid_step.m]
 mot.bm   = 0;                       % viscous part folded into T0
 mot.Vmax = P.psu.V;
-mot.cpr  = 700/N;                   % counts per MOTOR rev so that output = 700 CPR [CHECK x1/x4]
+mot.cpr  = 2800/N;                   % counts per MOTOR rev so that output = 700 CPR [CHECK x1/x4]
 P.mot = mot;
 
 %% Belt drive of the camera carriage
