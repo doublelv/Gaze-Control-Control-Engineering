@@ -12,16 +12,23 @@ clear; close all;
 root = setup_paths();
 P = params();
 
-SOURCE     = 'synthetic';       % 'webcam' | 'synthetic' | 'video'
+SOURCE     = 'webcam';       % 'webcam' | 'synthetic' | 'video'
 VIDEO_FILE = '';                % for 'video'
 DURATION   = 30;                % [s], Inf = until the window is closed
 SAVE_LOG   = true;              % head/gaze log to artifacts/logs (no images)
+LEDS       = true;              % 'webcam' only: IR LEDs on via the Nucleo during the demo
 
 P.cam.source = SOURCE;
 if strcmp(SOURCE, 'video'), P.cam.videoFile = VIDEO_FILE; end
 cam = camera_open(P);
 fprintf('Camera: %s\n', cam.name);
 cleanupCam = onCleanup(@() camera_close(cam));
+if LEDS && strcmp(SOURCE, 'webcam')
+    io = rig_open('serial', P);  cleanupRig = onCleanup(@() rig_close(io));
+    ledCmd = struct('duty', 0, 'servoUs', P.srv.zeroUs, 'led', logical(P.led.on));
+else
+    LEDS = false;
+end
 gcal = gaze_calib_file(P, 'load');
 if isempty(gcal), fprintf('No gaze calibration found (run_calibration) - head/eye tracking only.\n');
 else, fprintf('Gaze calibration from %s (LOO %.1f / %.1f deg)\n', gcal.created, gcal.loo); end
@@ -35,6 +42,7 @@ t0 = tic;
 while viz_alive(V.fig)
     tw = toc(t0);
     if tw > DURATION, break, end
+    if LEDS, io = rig_exchange(io, ledCmd); end    % keep the IR LEDs on (firmware watchdog 100 ms)
     if strcmp(SOURCE, 'synthetic'), tf = n/30; else, tf = tw; end
     [cam, img, inf_] = camera_read(cam, P, struct('t', tf, 'xCar', 0));
     if ~inf_.ok, fprintf('Camera: %s\n', inf_.err); break, end
@@ -60,7 +68,7 @@ while viz_alive(V.fig)
     if ~isempty(G) && G.valid, Lg.gaze(:, end+1) = G.uv; else, Lg.gaze(:, end+1) = NaN; end
 end
 fprintf('%d frames, %.1f fps, processing %.1f ms/frame (median), tracker locks: %d\n', ...
-        n, n/toc(t0), median(Lg.ms), T.nLocks);
+    n, n/toc(t0), median(Lg.ms), T.nLocks);
 if SAVE_LOG
     d = fullfile(root, 'artifacts', 'logs'); if ~exist(d, 'dir'), mkdir(d); end
     f = fullfile(d, sprintf('eye_demo_%s.mat', datestr(now, 'yyyymmdd_HHMMSS')));

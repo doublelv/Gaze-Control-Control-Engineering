@@ -24,7 +24,7 @@ switch mode
         error('rig_open:mode', 'unknown mode %s', mode);
 end
 % handshake
-for attempt = 1:3
+for attempt = 1:20
     io.seq = uint8(mod(double(io.seq) + 1, 256));
     [io, raw] = transact(io, encode_simple(C.T_HELLO, io.seq));
     h = decode_hello(raw, io.seq);

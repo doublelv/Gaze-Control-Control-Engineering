@@ -27,6 +27,9 @@ switch P.cam.source
         end
         cam.name = names{idx};
         cam.h = webcam(idx);
+        if isfield(P.cam, 'exposure') && ~isempty(P.cam.exposure)   % manual exposure (log2 s, -8 = 4 ms)
+            cam.h.ExposureMode = 'manual'; cam.h.Exposure = P.cam.exposure;
+        end
         want = sprintf('%dx%d', P.cam.W, P.cam.H);
         if any(strcmp(cam.h.AvailableResolutions, want))
             cam.h.Resolution = want;
