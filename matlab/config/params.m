@@ -247,6 +247,7 @@ P.trk.jumpGate  = 4;        % innovation > jumpGate*sigma + jumpMin = jump, no v
 P.trk.jumpMin   = 0.001;    % [m]
 P.trk.vffTau    = 0.15;     % low-pass on the velocity feed-forward [s] (saccades, noise)
 P.trk.deadband  = 0;        % carriage reference only changes if the head moved more than this [m]
+P.trk.holdBand  = 0;        % track_camera: motor off while the target is still and |error| < this [m]
 
 %% Head / eye motion scenario
 P.traj.Tend  = 6;
