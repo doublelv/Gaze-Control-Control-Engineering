@@ -3,7 +3,7 @@ function test_run_rig()
 %   Nucleo + motor + camera): io_check, homing + synthetic tracking, homing +
 %   camera tracking. Checks link errors, tracking error and that the camera
 %   follows the virtual user's head.
-envs = {'RIG_MODE', 'RIG_TASK', 'RIG_TRUN', 'RIG_SHOW'};
+envs = {'RIG_MODE', 'RIG_TASK', 'RIG_TRUN', 'RIG_SHOW', 'RIG_FACE_STUB'};
 c = onCleanup(@() cellfun(@(e) setenv(e, ''), envs));
 setenv('RIG_MODE', 'virtual'); setenv('RIG_SHOW', '0');
 r = run_task('io_check', 0);
@@ -18,6 +18,15 @@ S = synth_scene(r.P, 'demo');
 hx = arrayfun(@(tt) S.at(tt).head(1), r.L.t(ok));
 off = (hx - r.L.y(ok)*r.M.r)*1e3;
 assert(sqrt(mean(off.^2)) < 20, 'camera-to-head offset RMS %.1f mm', sqrt(mean(off.^2)));
+% same with P.trk.source = 'face' (stand-in face detector: bright face blob)
+setenv('RIG_FACE_STUB', 'face_stub_synthetic');
+r = run_task('track_camera', 5);
+setenv('RIG_FACE_STUB', '');
+ok = ~isnan(r.L.head(1,:)) & r.L.t > 2;
+assert(nnz(ok) > 50, 'face mode: too few head estimates');
+hx = arrayfun(@(tt) S.at(tt).head(1), r.L.t(ok));
+off = (hx - r.L.y(ok)*r.M.r)*1e3;
+assert(sqrt(mean(off.^2)) < 20, 'face mode: camera-to-head offset RMS %.1f mm', sqrt(mean(off.^2)));
 end
 
 function r = run_task(task, trun)
