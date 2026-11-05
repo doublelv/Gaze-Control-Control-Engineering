@@ -66,10 +66,12 @@ P.belt.r    = 40*2e-3/(2*pi);      % effective pulley radius [m] (12.7 mm)
 P.belt.mCar = 0.30;                % carriage + camera + illuminators [kg]  [PLACEHOLDER - weigh it]
 P.belt.Fc   = 2.0;                 % V-wheel rolling friction [N]          [PLACEHOLDER]
 %  Measured: the camera moves 0.65 m from the MIN stop to the MAX stop.
-%  x = 0 is the middle of the travel; 25 mm margin to each mechanical stop.
+%  x = 0 is the middle of the travel. Software limits P.belt.margin from each stop;
+%  beyond a limit run_rig never drives further outward (encoder guard).
 P.belt.travel = 0.65;                        % stop to stop [m] (measured)
+P.belt.margin = 0.05;                        % software limit to mechanical stop [m]
 P.belt.xStop = -P.belt.travel/2;             % carriage position at the MIN mechanical stop [m]
-P.belt.xMin = P.belt.xStop + 0.025; P.belt.xMax = -P.belt.xStop - 0.025;   % software limits [m]
+P.belt.xMin = P.belt.xStop + P.belt.margin; P.belt.xMax = -P.belt.xStop - P.belt.margin;   % software limits [m]
 
 %% Homing. The team has ONE endstop -> mount it at the MIN end and home on it.
 %  Without it: P.home.method = 'stall' (drive slowly into the mechanical stop).
