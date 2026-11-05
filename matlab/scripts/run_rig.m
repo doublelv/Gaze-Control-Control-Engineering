@@ -30,6 +30,9 @@ if ~isempty(getenv('RIG_TRUN')), TRUN = str2double(getenv('RIG_TRUN')); end
 if ~isempty(getenv('RIG_SHOW')), SHOW = strcmp(getenv('RIG_SHOW'), '1'); end
 
 P = params();
+if ~isempty(getenv('RIG_FACE_STUB'))             % tests: face mode with a stand-in detector
+    P.trk.source = 'face'; P.face.detectFcn = str2func(getenv('RIG_FACE_STUB'));
+end
 assert(strcmp(P.loopMode, 'matlab'), 'set P.loopMode = ''matlab'' in params.m');
 M = build_axis_model(P.ax(1), P);
 C = design_pid(M, P.ax(1), P.Ts);
@@ -144,6 +147,9 @@ if useCam
     gcal = gaze_calib_file(P, 'load');
     P.bSP = P.trk.bSP;                           % no set-point weighting while tracking
     tLastFrame = NaN; Gs = [];
+    useFace = strcmp(P.trk.source, 'face');      % follow the face box (no LEDs needed)
+    fd = []; fbox = []; zFace = NaN; hFace = [];
+    if useFace, fprintf('Following the FACE (P.trk.source = ''face'')\n'); end
 end
 if SHOW && useCam, V = viz_live_init(P, sprintf('run_rig %s (%s)', TASK, MODE)); end
 
@@ -175,13 +181,20 @@ for k = 1:n
                 [cam, img, inf_] = camera_read(cam, P, ctx);
                 if inf_.ok
                     tFrame = tNow; if realtime, tFrame = toc(tk.t0); end
-                    det = eye_detect(img, P, eye_tracker_prior(T, tFrame, P));
+                    imgE = img;
+                    if useFace                   % face first; pupils only inside the face
+                        [fbox, fd] = face_find(fd, img, P, fbox);
+                        imgE = face_mask(img, fbox);
+                    end
+                    det = eye_detect(imgE, P, eye_tracker_prior(T, tFrame, P));
                     [T, obs] = eye_tracker_update(T, det, tFrame, P);
                     [H, T] = head_estimate(obs, T, xCar, P);
+                    if useFace, [H, zFace] = face_head(fbox, H, zFace, xCar, P); end
                     dtf = tFrame - tLastFrame; if isnan(dtf), dtf = P.cam.every*P.Ts; end
                     tLastFrame = tFrame;
                     [kf, pHat, vHat] = eye_filter(kf, H.pos, dtf, P, H.valid);
-                    if ~any(isnan(pHat)) && ~any(strcmp(obs.status, {'search', 'lost'}))
+                    if useFace, trackOk = H.valid; else, trackOk = ~any(strcmp(obs.status, {'search', 'lost'})); end
+                    if ~any(isnan(pHat)) && trackOk
                         refNow = refs_from_eye(P, pHat);
                         inside = refNow(1)*M.r > P.belt.xMin && refNow(1)*M.r < P.belt.xMax;
                         vFFraw = P.trk.useVelFF*inside*vHat(1)/M.r;
@@ -203,6 +216,12 @@ for k = 1:n
                         V = viz_live_update(V, tNow, img, det, obs, H, G, xCar, ...
                             struct('loop_ms', round(median_valid(L.loopMs(max(1,k-50):k))), ...
                                    'link_err', io.nErr, 'frame_ms', round(L.frameMs(k))));
+                        if useFace && isfield(V, 'hDet') && ~isempty(V.hDet)   % magenta face box
+                            if isempty(hFace), hFace = plot(V.axCam, NaN, NaN, 'm-', 'LineWidth', 2); end
+                            if isempty(fbox), set(hFace, 'XData', NaN, 'YData', NaN);
+                            else, b = fbox; set(hFace, 'XData', b(1) + [0 b(3) b(3) 0 0] - 0.5, ...
+                                                      'YData', b(2) + [0 0 b(4) b(4) 0] - 0.5); end
+                        end
                     end
                 end
             end

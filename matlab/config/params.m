@@ -221,6 +221,18 @@ P.trk.lostAfter   = 1.0;     % missing longer -> 'lost', full-frame search [s]
 P.trk.maxJumpM    = 0.02;    % a detection further than this from the prediction is rejected [m]
 P.trk.vHeadMax    = 0.5;     % max head speed, widens the gate while an eye is unseen [m/s]
 
+%% What the carriage follows in run_rig TASK = 'track_camera'
+%  'eyes': pupil pair (needs the IR LEDs: dark pupil + glints)
+%  'face': face box (Viola-Jones, Computer Vision Toolbox) -> works in room light
+%          without LEDs; the pupil detector then only searches inside the face.
+P.trk.source = 'eyes';
+P.face.width      = 0.15;    % real width of the detected face box [m]  [CHECK: z shown vs. tape measure]
+P.face.eyeLevel   = 0.40;    % eye height inside the box, from the top (fraction of box height)
+P.face.scale      = 0.5;     % detect on a downscaled frame (speed): 1/2, 1/3, ... (every k-th pixel)
+P.face.minSizePx  = 80;      % smallest face [px, full resolution] (~1 m away)
+P.face.zAlpha     = 0.3;     % low-pass on the distance from the face width
+P.face.detectFcn  = [];      % tests only: replacement detector @(img) boxes
+
 %% Head estimate (eye_detection/head_estimate.m)
 P.head.zDefault   = 0.60;    % distance used until both eyes have been seen [m]
 P.head.zAlpha     = 0.2;     % low-pass on the distance from the eye spacing
