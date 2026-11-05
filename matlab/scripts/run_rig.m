@@ -232,7 +232,7 @@ for k = 1:n
                             struct('loop_ms', round(median_valid(L.loopMs(max(1,k-50):k))), ...
                                    'link_err', io.nErr, 'frame_ms', round(L.frameMs(k))));
                         if useFace && isfield(V, 'hDet') && ~isempty(V.hDet)   % magenta face box
-                            if isempty(hFace), hFace = plot(V.axCam, NaN, NaN, 'm-', 'LineWidth', 2); end
+                            if isempty(hFace) || ~ishghandle(hFace), hFace = plot(V.axCam, NaN, NaN, 'm-', 'LineWidth', 2); end
                             if isempty(fbox), set(hFace, 'XData', NaN, 'YData', NaN);
                             else, b = fbox; set(hFace, 'XData', b(1) + [0 b(3) b(3) 0 0] - 0.5, ...
                                                       'YData', b(2) + [0 0 b(4) b(4) 0] - 0.5); end
@@ -249,9 +249,14 @@ for k = 1:n
     ref = refNow(:);
     ref(1) = refPrev + min(max(ref(1) - refPrev, -dmax), dmax);
     ref(1) = min(max(ref(1), P.belt.xMin/M.r), P.belt.xMax/M.r);   % software limits
+    refSteady = abs(ref(1) - refPrev) < 1e-9;
     refPrev = ref(1);
     Vff = M.Ke*vFF + M.R*M.Tc/M.Kt*tanh(vFF/0.05);
-    [Vm, st] = pid_step(st, C, M, P, ref(1), y, Vff, dt);
+    if useCam && refSteady && abs(ref(1) - y)*M.r < P.trk.holdBand
+        Vm = 0; st.yPrev = y; st.D = 0;          % close enough and target still: motor off, no hunting
+    else
+        [Vm, st] = pid_step(st, C, M, P, ref(1), y, Vff, dt);
+    end
     if ~fb.ok, Vm = 0; end                                       % no fresh encoder value: coast
     cmd.duty = Vm/M.Vmax*P.drv.pwmCounts;
     tiltCmd = ref(2:3)';
