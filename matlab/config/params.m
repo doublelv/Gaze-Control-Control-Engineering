@@ -6,8 +6,9 @@ function P = params()
 %   Axis order everywhere in this project:
 %     1 = Camera X  : LINEAR carriage on 2020 V-slot, V-wheels, GT2 belt,
 %                     FIT0186 geared DC motor + encoder, MDD10A driver
-%     2 = Illum A Y : tilt, SER0006 micro servo
-%     3 = Illum B Y : tilt, SER0006 micro servo
+%     2 = Illum A   : pan, SER0006 micro servo on the MIN-side leg of the frame
+%     3 = Illum B   : pan, SER0006 micro servo on the MAX-side leg of the frame
+%     (the servos are fixed to the U-frame, NOT on the carriage; see P.led)
 %   Controller board: NUCLEO-H753ZI (STM32H753, Cortex-M7)
 
 %% Timing / architecture
@@ -86,15 +87,15 @@ srv.framePer = 20e-3;              % 50 Hz
 srv.Kin      = 40;                 % internal loop gain [1/s]     [PLACEHOLDER]
 srv.tauW     = 0.015;              % speed lag [s]                [PLACEHOLDER]
 srv.usRes    = 1;                  % STM32 timer gives <=1 us easily
-srv.zeroUs   = [1500 1500];        % pulse [us] at which each LED points horizontal [CALIBRATE]
-srv.dir      = [1 1];              % +1/-1: does a longer pulse tilt up?           [CALIBRATE]
+srv.zeroUs   = [1500 1500];        % pulse [us] at which each LED points straight ahead (+z, at the user) [CALIBRATE]
+srv.dir      = [1 1];              % +1 if a longer pulse turns the LED toward +x (MAX side), else -1   [CALIBRATE]
 P.srv = srv;
 
 %% Axes
 %  type 'dc' (our PID on the Nucleo) or 'servo'
 %  r    : pulley radius for linear axes [m], 0 for rotary
 %  JL   : load inertia at output shaft [kg m^2],  Tc: Coulomb friction at output [Nm]
-%  m, l : mass and CoM offset from tilt axis (gravity = m g l cos(theta))
+%  m, l : mass and CoM offset from tilt axis (gravity = m g l cos(theta)); 0 for pan axes
 %  bwHz, zeta, alpha : pole-placement spec (dc only)
 %  vmax : reference slew limit [rad/s at the output shaft]
 r = P.belt.r;
@@ -103,11 +104,11 @@ ax = struct('name',{}, 'type',{}, 'r',{}, 'JL',{}, 'bL',{}, 'Tc',{}, 'm',{}, 'l'
 ax(1) = struct('name','Camera X (linear)','type','dc','r',r, ...
                'JL',P.belt.mCar*r^2,'bL',0,'Tc',mot.T0 + P.belt.Fc*r, ...
                'm',0,'l',0,'bwHz',bwCam,'zeta',0.8,'alpha',1.0,'vmax',0.8*wNL);
-ax(2) = struct('name','Illum A Y (tilt)','type','servo','r',0,'JL',2e-6,'bL',0,'Tc',0, ...
-               'm',0.01,'l',0.01,'bwHz',NaN,'zeta',NaN,'alpha',NaN,'vmax',3);
-ax(3) = struct('name','Illum B Y (tilt)','type','servo','r',0,'JL',2e-6,'bL',0,'Tc',0, ...
-               'm',0.01,'l',0.01,'bwHz',NaN,'zeta',NaN,'alpha',NaN,'vmax',3);
-%  servo load: 5 mm IR LED + small perfboard piece, ~10 g at 1 cm   [PLACEHOLDER]
+ax(2) = struct('name','Illum A (pan)','type','servo','r',0,'JL',2e-6,'bL',0,'Tc',0, ...
+               'm',0,'l',0,'bwHz',NaN,'zeta',NaN,'alpha',NaN,'vmax',3);
+ax(3) = struct('name','Illum B (pan)','type','servo','r',0,'JL',2e-6,'bL',0,'Tc',0, ...
+               'm',0,'l',0,'bwHz',NaN,'zeta',NaN,'alpha',NaN,'vmax',3);
+%  servo load: 5 mm IR LED + small holder, ~10 g; vertical servo axis (pan) -> no gravity torque
 P.ax = ax;
 P.useGravFF = true;
 P.bSP       = 0.6;     % set-point weight on P-term
@@ -120,27 +121,38 @@ P.led.Rser = 68;  P.led.Prated = 0.25;                     % Yageo MFR-25 68R
 P.led.n    = 4;    % schematic: 4 IR LEDs, each 68R + NPN switch (470R base, 10k pull-down)
 %   LED i = J10 'IR LED i' = Nucleo LED_i (PF3, PD15, PD14, PA4) = schematic D(5-i)
 %   (J10 'IR LED 1' drives D4 ... 'IR LED 4' drives D1). See docs/hardware/hardware.md.
-P.led.on   = [1 1 1 1];  % which LEDs to switch on while tracking
-%  Position of each LED relative to the camera, on the carriage [m]   [CHECK WITH THE BUILD]
-%  LED 1, 2: on the servos (tilt toward the eyes). LED 3, 4: fixed next to the camera.
-P.led.pos   = [-0.06  0.06 -0.025 0.025;
-               -0.03 -0.03  0.000 0.000;
-                0     0     0     0    ];
-P.led.servo = [1 2 0 0];   % LED i is tilted by servo k (0 = fixed, pointing +z)
+P.led.on   = [0 0 1 1];  % which LEDs to switch on (calibration, demo and tracking)
+%  NOTE: the gaze feature uses the centroid of ALL glints. The frame LEDs (1, 2)
+%  do not move with the camera, so their glints shift when the head moves
+%  sideways -> gaze bias (test_gaze fails with [1 1 1 1]). Default: camera LEDs
+%  only. For a servo demo set [1 1 1 1] in params_local.m (and recalibrate).
+%
+%  LED layout (as built): LED 1, 2 on the pan servos on the two legs of the
+%  U-frame (fixed to the frame); LED 3, 4 fixed next to the camera on the carriage.
+P.led.servo   = [1 2 0 0];               % LED i is panned by servo k (0 = no servo, points +z)
+P.led.onFrame = [true true false false]; % true: fixed to the frame, false: rides on the carriage
+P.led.aim     = 'pan';                   % servo axis: 'pan' (vertical axis, as built) | 'tilt'
+%  P.led.pos [m], one column per LED, rows x/y/z:
+%   carriage LED: offset from the camera lens (x along the rail, y up, z toward the user)
+%   frame LED   : x = distance along the rail from the camera lens WHEN THE CARRIAGE
+%                 IS AT THE MIN STOP (where stall homing ends) to the servo shaft,
+%                 positive toward the MAX end (negative if the leg is beyond the stop);
+%                 y = height of the LED above the camera lens (negative = below);
+%                 z = how far the LED is in front of the lens (toward the user).
+%   -> world position: see led_world_pos.m
+P.led.pos = [-0.03   0.60   -0.025  0.025;    % [PLACEHOLDER - measure]
+             -0.25  -0.25    0.000  0.000;    % [PLACEHOLDER - measure]
+              0.02   0.02    0.000  0.000];   % [PLACEHOLDER - measure]
 
-%% Cross-axis coupling: carriage acceleration -> disturbance on the tilt servos
-c = 0.05;                                          % [PLACEHOLDER]
-P.kc = [0 0 0; c 0 0; c 0 0];
+%% Cross-axis coupling: carriage acceleration -> disturbance on the servos.
+%  The servos are on the frame, not on the carriage -> no coupling.
+P.kc = zeros(3);
 
-%% Geometry, world frame [m]: x right, y up, z toward the user.
+%% Geometry, world frame [m]: x along the rail (+ = +encoder = MAX side), y up, z toward the user.
 %  Camera on the carriage at (xCar, 0, 0) looking +z (no rotation).
-%  Illuminators also on the carriage, offset from the camera       [CHECK WITH TEAM]
+%  LED positions in this frame: led_world_pos(P, xCar)
 %  (camera + both lights must NOT be collinear, see gaze_sim)
-P.geo.cam        = [0; 0; 0];
-P.geo.illumA_off = P.led.pos(:,1);               % servo LED A
-P.geo.illumB_off = P.led.pos(:,2);               % servo LED B
-P.geo.illumA = P.geo.cam + P.geo.illumA_off;      % at carriage x = 0 (gaze_sim)
-P.geo.illumB = P.geo.cam + P.geo.illumB_off;
+P.geo.cam    = [0; 0; 0];
 P.geo.cam2   = [0.10; 0; 0];                      % hypothetical 2nd camera, stereo comparison only
 
 %% Serial link to the Nucleo (ST-LINK virtual COM port = USART3 on Nucleo-144)

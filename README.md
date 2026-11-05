@@ -2,7 +2,7 @@
 Public repo for Fontys Master System Design, Control Engineering class, Group 1.
 
 A 3-axis eye-tracking rig: a camera carriage driven by a DC motor on a belt follows the user's
-head, two servo-tilted IR LEDs light the eyes, and MATLAB tracks the pupils, the head and
+head, two pan servos on the frame turn IR LEDs toward the eyes, and MATLAB tracks the pupils, the head and
 (after calibration) the gaze point on the screen.
 
 **Status:** complete software (MATLAB + STM32 firmware). All offline tests pass (Octave + gcc,

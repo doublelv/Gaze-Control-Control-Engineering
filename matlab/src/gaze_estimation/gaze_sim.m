@@ -26,7 +26,8 @@ function G = gaze_sim(P)
 
 rng(P.gaze.seed);
 O1 = P.geo.cam; O2 = P.geo.cam2;
-L  = [P.geo.illumA P.geo.illumB];
+Lall = led_world_pos(P, 0);                        % carriage at x = 0
+L  = Lall(:, [find(P.led.servo == 1, 1), find(P.led.servo == 2, 1)]);   % the two servo LEDs
 R  = P.eye.R; K = P.eye.K; f = P.cam.f_px;
 
 cam1 = make_cam(O1, P.traj.p0, f);

@@ -35,10 +35,10 @@ $V_{ff} = K_e\,\hat\omega_{ref} + R\,\tau_c/K_t\,\tanh(\hat\omega_{ref}/0.05)$.
 ## 3. Reference generation (MIMO coordinator, `refs_from_eye.m`)
 One head estimate drives three axes:
 - carriage $x_{ref}$ = head x, clipped to the travel, slew-limited to 0.8 x no-load speed;
-- tilt of LED 1, 2 = $\mathrm{atan2}(y_{eye} - y_{LED},\ \sqrt{(x_{eye} - x_{LED})^2 + (z_{eye} - z_{LED})^2})$, using the
-  carriage **reference** (feed-forward) so the LEDs do not wait for the carriage.
-Cross-coupling (carriage acceleration -> servo disturbance) is modelled in `simulate_rig.m`; the
-servos have a 130x torque margin, so it is negligible.
+- pan of LED 1, 2 = $\mathrm{atan2}(x_{eye} - x_{LED},\ z_{eye} - z_{LED})$ (`led_aim.m`). The two servos sit on
+  the legs of the U-frame, so $x_{LED}$, $z_{LED}$ are fixed (`led_world_pos.m`); they do not depend on the carriage.
+Because the servos are not on the carriage there is no cross-coupling (carriage acceleration ->
+servo disturbance): `P.kc = 0`.
 
 ## 4. Head-position filter (`eye_filter.m`)
 Per axis a constant-velocity Kalman filter, $x = [p\ v]^T$,

@@ -22,7 +22,7 @@ try
             if nargin < 3, ctx = struct(); end
             if ~isfield(ctx, 't'),    ctx.t = info.t; end
             if ~isfield(ctx, 'xCar'), ctx.xCar = 0; end
-            if ~isfield(ctx, 'led'),  ctx.led = true(1, P.led.n); end
+            if ~isfield(ctx, 'led'),  ctx.led = logical(P.led.on); end
             if ~isfield(ctx, 'tilt'), ctx.tilt = [0 0]; end
             s = cam.scene.at(ctx.t);
             [img, tr] = synth_render(P, s, ctx.xCar, ctx.led, ctx.tilt);

@@ -14,7 +14,7 @@
    │  firmware = I/O bridge + safety (watchdog, endstop gating)
    ├─ TIM4 PWM + DIR ─> MDD10A ─> FIT0186 motor ─> GT2 belt ─> camera carriage
    ├─ TIM2 encoder  <─ FIT0186 encoder
-   ├─ TIM3 PWM x2   ─> SER0006 servos (tilt of LED 1, 2)
+   ├─ TIM3 PWM x2   ─> SER0006 servos (pan of LED 1, 2)
    ├─ GPIO x4       ─> NPN ─> IR LEDs 1-4
    └─ GPIO          <─ endstop (MIN end)
 ```
@@ -37,7 +37,7 @@ Decision: `docs/decisions/0001-control-loop-in-matlab.md`. Protocol: `interface/
 - **Image**: pixels; u right, v **down**; pixel (row r, col c) has its centre at (c - 0.5, r - 0.5).
   Principal point = image centre, f = 550 px (1.65 mm / 3 um) **[CHECK by camera calibration]**.
 - **Eyes**: index 1 = right in the image (the user's left eye), 2 = left in the image.
-- **Servo LEDs**: tilt angle [rad] above horizontal; pulse = zeroUs + dir * angle / (pi / 2000 us).
+- **Servo LEDs**: pan angle [rad] from straight ahead (+z), + toward the MAX side; pulse = zeroUs + dir * angle / (pi / 2000 us).
 
 ## Timing budget (per 10 ms control period)
 | Item | Budget | Notes |

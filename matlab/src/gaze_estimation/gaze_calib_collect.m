@@ -1,14 +1,17 @@
-function [V, X, info] = gaze_calib_collect(P, cam, ui, xCar)
+function [V, X, info, rig] = gaze_calib_collect(P, cam, ui, xCar, rig)
 %GAZE_CALIB_COLLECT  Show calibration targets and record PCCR features.
 %   P   : params,  cam : camera_open(...) result
 %   ui  : struct with .show (logical) and, if shown, .fig/.ax/.dot from
 %         gaze_calib_window. With ui.show = false nothing is drawn (tests).
 %   xCar: camera (carriage) position [m] during calibration (default 0)
+%   rig : optional struct .io (rig_open result) and .cmd: sent every frame so the
+%         IR LEDs stay on (the firmware watchdog switches them off after 100 ms)
 %   V   : 2 x 2 x K median PCCR features [component, eye, target]
 %   X   : 2 x K target positions on the screen plane [m]
 %   info: per-target sample counts and spread (quality check)
 %   For a 'synthetic' camera the virtual user looks at each target.
-if nargin < 4, xCar = 0; end
+if nargin < 4 || isempty(xCar), xCar = 0; end
+if nargin < 5, rig = []; end
 [Xw, uvS] = screen_points(P);
 K = size(Xw, 2);
 X = Xw(1:2, :);
@@ -23,6 +26,7 @@ for k = 1:K
     samples = {zeros(2, 0), zeros(2, 0)};
     t0 = tic; tRec = 0;
     while true
+        if ~isempty(rig), rig.io = rig_exchange(rig.io, rig.cmd); end   % keep the LEDs on
         if synth
             tSim = tSim + dtSim; tNow = tSim; tRec = tRec + dtSim;
             [cam, img, inf_] = camera_read(cam, P, struct('t', tSim, 'xCar', xCar));

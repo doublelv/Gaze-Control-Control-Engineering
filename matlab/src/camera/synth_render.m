@@ -3,7 +3,7 @@ function [img, truth] = synth_render(P, s, xCar, ledMask, tilt)
 %   s       : scene state from synth_scene(...).at(t)
 %   xCar    : carriage (camera) position [m]
 %   ledMask : 1 x P.led.n logical, LEDs switched on
-%   tilt    : 1x2 servo LED tilt angles [rad] (beam direction, 0 = horizontal)
+%   tilt    : 1x2 servo LED angles [rad] (P.led.aim pan or tilt, 0 = straight ahead +z)
 %   img     : H x W uint8 (mono)
 %   truth   : ground truth: .pupil (2x2 full-image px, [right left]),
 %             .glints{e} (2xN px), .rPupilPx (1x2), .visible (1x2), .illum
@@ -19,12 +19,13 @@ Rr = [cos(s.roll) -sin(s.roll) 0; sin(s.roll) cos(s.roll) 0; 0 0 1];
 pxPerM = @(z) P.cam.f_px/max(z - C(3), 1e-3);
 
 % ---- LED illumination of the face (beam pattern, cos^n-like)
-Lpos = C + P.led.pos;
+Lpos = led_world_pos(P, xCar);
+[~, beam] = led_aim(P, Lpos(:,1), Lpos(:,1) + [0; 0; 1]);
 illum = 0; ledI = zeros(1, P.led.n);
 for i = 1:P.led.n
     if ~ledMask(i), continue, end
     ax = [0; 0; 1];
-    if P.led.servo(i) > 0, a = tilt(P.led.servo(i)); ax = [0; sin(a); cos(a)]; end
+    if P.led.servo(i) > 0, ax = beam(tilt(P.led.servo(i))); end
     d = s.head - Lpos(:,i); d = d/norm(d);
     ang = acos(max(-1, min(1, ax'*d)))*180/pi;
     ledI(i) = 2^(-(ang/P.led.halfAngleDeg)^2);
