@@ -8,7 +8,7 @@ function io = rig_open(mode, P)
 %   Opening the link does NOT move any actuator.
 C = proto_const();
 io = struct('mode', mode, 'P', P, 'seq', uint8(0), 'nErr', 0, 'nTimeout', 0, ...
-            'nWdog', 0, 'last', [], 'hello', [], 's', [], 'sim', []);
+            'nWdog', 0, 'last', [], 'hello', [], 's', [], 'sim', [], 'encLast', [], 'encT', []);
 switch mode
     case 'serial'
         ports = string(serialportlist("available"));

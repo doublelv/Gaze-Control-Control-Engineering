@@ -168,6 +168,7 @@ P.link.port = "COM5";      % Windows: check Device Manager; macOS/Linux: "/dev/t
 P.link.baud = 921600;      % [CHECK] must match the firmware
 P.link.watchdog = 0.1;     % firmware stops the motor if no command for 100 ms
 P.link.timeout  = 0.05;    % serial read timeout [s]
+P.link.maxCountRate = 1.5*wNL/(2*pi)*2800;   % encoder plausibility: counts/s above this = jump (Nucleo reset?) -> STOP
 
 %% Camera: Waveshare OV9281 1MP Mono USB Camera (A)
 %  mono, NO IR filter (sees 850 nm), global shutter, USB2 MJPG, 1280x720 @120 fps,
