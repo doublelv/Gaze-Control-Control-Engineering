@@ -69,10 +69,10 @@ P.belt.xStop = P.belt.xMin - 0.005;          % carriage position at the MIN mech
 
 %% Homing. The team has ONE endstop -> mount it at the MIN end and home on it.
 %  Without it: P.home.method = 'stall' (drive slowly into the mechanical stop).
-P.home.method = 'endstop';    % 'endstop' | 'stall'
+P.home.method = 'stall';    % 'endstop' | 'stall'
 P.home.duty   = 0.2;          % fraction of 12 V while homing (2.4 V, ~1.4 A at stall)
 P.home.tStall = 0.2;          % encoder still for this long = at the stop [s]
-P.endstops   = [true false];  % [MIN MAX] wired? must match USE_END_MIN / USE_END_MAX in the firmware
+P.endstops   = [false false];  % [MIN MAX] wired? must match USE_END_MIN / USE_END_MAX in the firmware
 
 %% SER0006 micro servo (DFRobot / Farnell): 4.8-6 V, 0.156 Nm @6 V
 %  (1.3 kg*cm used = conservative @4.8 V), 0.12 s/60 deg @4.8 V, dead band 7 us.
