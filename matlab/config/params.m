@@ -177,6 +177,7 @@ P.cam.H     = 720;
 P.cam.fps   = 120;
 P.cam.zEye  = 0.60;                 % fallback eye distance if both eyes are not seen [m]
 P.cam.latency = 0.020;              % exposure + MJPG + USB + decode [s]    [PLACEHOLDER - measure]
+%  (run_rig serial: the carriage position at t - latency is used for each frame)
 P.cam.sigmaPx = 0.5;                % pupil-centre noise [px]               [PLACEHOLDER]
 P.cam.zRelErr = 0.05;               % distance estimate error (from eye spacing) [-]
 P.cam.blinks  = [1.5 4.6];          % blink start times in the scenario [s] (150 ms each)
@@ -245,6 +246,7 @@ P.trk.bSP       = 1.0;      % no set-point weighting while tracking (b<1 adds la
 P.trk.jumpGate  = 4;        % innovation > jumpGate*sigma + jumpMin = jump, no velocity update
 P.trk.jumpMin   = 0.001;    % [m]
 P.trk.vffTau    = 0.15;     % low-pass on the velocity feed-forward [s] (saccades, noise)
+P.trk.deadband  = 0;        % carriage reference only changes if the head moved more than this [m]
 
 %% Head / eye motion scenario
 P.traj.Tend  = 6;
