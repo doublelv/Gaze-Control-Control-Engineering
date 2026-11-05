@@ -3,14 +3,16 @@
 %   dot. The result goes to matlab/config/local/gaze_calibration.mat (git-ignored,
 %   personal data). run_eye_demo and run_rig use it automatically.
 %   SOURCE 'synthetic' runs the whole procedure with a virtual user (no hardware).
-%   Hardware effects: none (the rig does not move; turn the LEDs on first if they
-%   are driven by the Nucleo: run_rig TASK = 'io_check' leaves them off).
+%   Hardware effects ('webcam' with LEDS = true): the Nucleo switches on the IR
+%   LEDs in P.led.on for the whole calibration; the motor does not move and the
+%   servos stay at P.srv.zeroUs. Use the SAME P.led.on as when tracking.
 
 clear; close all;
 root = setup_paths();
 P = params();
 SOURCE = 'synthetic';           % 'webcam' | 'synthetic'
 SHOW   = true;                  % full-screen dots (false: headless, synthetic only)
+LEDS   = true;                  % 'webcam' only: IR LEDs on via the Nucleo during calibration
 
 P.cam.source = SOURCE;
 if strcmp(SOURCE, 'synthetic')
@@ -19,9 +21,15 @@ else
     cam = camera_open(P);
 end
 cleanupCam = onCleanup(@() camera_close(cam));
+rig = [];
+if LEDS && strcmp(SOURCE, 'webcam')
+    rig.io = rig_open('serial', P);  cleanupRig = onCleanup(@() rig_close(rig.io));
+    rig.cmd = struct('duty', 0, 'servoUs', P.srv.zeroUs, 'led', logical(P.led.on));
+    fprintf('IR LEDs on: %s\n', mat2str(find(P.led.on)));
+end
 ui = struct('show', false);
 if SHOW, ui = gaze_calib_window(P, 'open'); end
-[V, X, info] = gaze_calib_collect(P, cam, ui);
+[V, X, info, rig] = gaze_calib_collect(P, cam, ui, 0, rig);
 fprintf('Samples per point (right / left eye):\n'); disp(info.n);
 bad = any(info.n < P.gcal.minSamples, 1);
 if any(bad), fprintf('Points without enough samples: %s (eyes not detected?)\n', mat2str(find(bad))); end

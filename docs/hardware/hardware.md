@@ -9,7 +9,7 @@
 | DFRobot FIT0186 | carriage motor | 12 V, 43.8:1, 251 rpm, 18 kg·cm stall, 7 A stall, encoder 16 CPR motor = 700 CPR output, 6 mm D-shaft |
 | GT2 6 mm belt, 40T pulley (6.35 mm bore), smooth idler (5 mm) | linear drive | 80 mm per output revolution. **Pulley bore 6.35 on a 6 mm shaft: shim or sleeve** |
 | V-slot wheels (24 mm), M5 T-nuts for 2020 | carriage guide | 2020 **V-slot** profile needed |
-| 2 x DFRobot SER0006 | LED tilt | 4.8-6 V, 0.156 N·m at 6 V, 0.12 s/60 deg, 7 us dead band |
+| 2 x DFRobot SER0006 | LED pan (on the frame legs) | 4.8-6 V, 0.156 N·m at 6 V, 0.12 s/60 deg, 7 us dead band |
 | 4 x Würth IR LED 850 nm + 68 Ω | illumination | 50 mA, Vf <= 2.2 V, 35 deg half-intensity angle **[CHECK full/half]** |
 | 4 x NPN + 470 Ω base + 10 kΩ pull-down | LED switches | from the team schematic |
 | Buck converter 12 V -> 5 V | servos (+ LEDs) | ordered by the team (TinyTronics) **[CHECK current >= 2 A]** |

@@ -2,6 +2,7 @@ function test_link_virtual()
 %TEST_LINK_VIRTUAL  Whole MATLAB link layer against the virtual MCU:
 %   handshake, CMD/STATE round trip, endstop gating, watchdog, corrupt frames.
 P = params(); rng(4);
+P.endstops = [true false];                      % test the gating even if the rig has no endstop wired
 io = rig_open('virtual', P);
 assert(io.hello.ok && io.hello.proto == proto_const().version, 'handshake');
 cmd = struct('duty', -0.3*P.drv.pwmCounts, 'servoUs', P.srv.zeroUs, 'led', false(1, 4));
@@ -14,7 +15,7 @@ end
 assert(hit, 'endstop never reached');
 c0 = fb.count;
 for k = 1:20, [io, fb] = rig_exchange(io, cmd); end
-assert(fb.limited && abs(double(fb.count - c0)) < 50, 'endstop does not stop the motor');
+assert(fb.limited && abs(double(fb.count - c0)) < 150, 'endstop does not stop the motor');   % 150 counts ~ 5 mm at 2800 CPR (coast)
 % watchdog: no command for 0.2 s while driving -> motor stopped, flag set
 cmd.duty = 0.3*P.drv.pwmCounts;
 [io, fb] = rig_exchange(io, cmd);

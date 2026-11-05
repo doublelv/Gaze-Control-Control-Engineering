@@ -32,7 +32,7 @@ Not yet run in MATLAB or on the hardware.
 ## Data flow
 camera -> `eye_detect` (pupils, glints) -> `eye_tracker_update` (left/right, blink, lost) ->
 `head_estimate` (x, y, z, roll) -> `eye_filter` (Kalman, latency) -> `refs_from_eye`
-(carriage x, LED tilts) -> `pid_step` -> `rig_exchange` -> Nucleo.
+(carriage x, LED pan angles) -> `pid_step` -> `rig_exchange` -> Nucleo.
 Gaze: `gaze_features` (PCCR) -> `gaze_calib_apply` -> screen point.
 
 ## Folders

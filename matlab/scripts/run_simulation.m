@@ -142,11 +142,17 @@ for c = 1:3
     dz   = pEye(3,:) - P.geo.cam(3);
     res(c).uPx = P.cam.f_px*(pEye(1,:) - (P.geo.cam(1) + xCar))./dz;
     res(c).vPx = P.cam.f_px*(pEye(2,:) - P.geo.cam(2))./dz;
-    % ideal tilt for the ACTUAL carriage position
-    offs = [P.geo.illumA_off P.geo.illumB_off]; led = zeros(2,n);
+    % ideal servo angle for the ACTUAL carriage position (frame LEDs: fixed)
+    led = zeros(2,n);
     for j = 1:2
-        Lx = P.geo.cam(1) + xCar + offs(1,j); Ly = P.geo.cam(2) + offs(2,j);
-        aim = atan2(pEye(2,:) - Ly, hypot(pEye(1,:) - Lx, pEye(3,:) - offs(3,j)));
+        i = find(P.led.servo == j, 1);
+        if isempty(i), continue, end
+        aim = zeros(1,n);
+        if P.led.onFrame(i)
+            L = led_world_pos(P, 0); aim = led_aim(P, L(:,i), pEye);
+        else
+            for k = 1:n, L = led_world_pos(P, xCar(k)); aim(k) = led_aim(P, L(:,i), pEye(:,k)); end
+        end
         led(j,:) = (Tc.th(j+1,:) - aim)*r2d;
     end
     res(c).ledErr = led; res(c).T = Tc; res(c).R = Rc;
