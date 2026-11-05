@@ -161,7 +161,7 @@ refPrev = y; tiltCmd = [0 0];
 refNow = [y; 0; 0]; vFF = 0; vFFraw = 0;
 L = struct('task', TASK, 'mode', MODE, 't', t, 'ref', nan(3, n), 'y', nan(1, n), 'V', nan(1, n), ...
            'loopMs', nan(1, n), 'ok', false(1, n), 'head', nan(3, n), 'statusCode', nan(1, n), ...
-           'gaze', nan(2, n), 'frameMs', nan(1, n), 'nOverrun', 0);
+           'gaze', nan(2, n), 'frameMs', nan(1, n), 'nOverrun', 0, 'nGuard', 0);
 codes = {'search', 'track', 'blink', 'lost'};
 fprintf('Running %s for %.0f s (%s). Close the window or Ctrl-C to stop.\n', TASK, TRUN, MODE);
 tk.t0 = tic; tPrevLoop = 0;
@@ -258,6 +258,11 @@ for k = 1:n
         [Vm, st] = pid_step(st, C, M, P, ref(1), y, Vff, dt);
     end
     if ~fb.ok, Vm = 0; end                                       % no fresh encoder value: coast
+    % encoder guard: past a software limit, never drive further outward (overshoot, stalls)
+    if (xCar >= P.belt.xMax && Vm > 0) || (xCar <= P.belt.xMin && Vm < 0)
+        Vm = 0; st.I = 0;                        % and drop the wound-up integrator
+        L.nGuard = L.nGuard + 1;
+    end
     cmd.duty = Vm/M.Vmax*P.drv.pwmCounts;
     tiltCmd = ref(2:3)';
     cmd.servoUs = [toUs(ref(2), 1), toUs(ref(3), 2)];
@@ -271,6 +276,7 @@ cmd.duty = 0; cmd.led = ledsOff; rig_exchange(io, cmd);
 
 %% ------------------------------------------------------------ report
 fprintf('Link errors: %d of %d, watchdog trips: %d, loop overruns: %d\n', io.nErr, n, io.nWdog, L.nOverrun);
+if L.nGuard > 0, fprintf('Encoder guard stopped an outward move %d times (carriage past a software limit)\n', L.nGuard); end
 if realtime
     fprintf('Loop time: median %.2f ms, max %.2f ms (budget %.0f ms)\n', median_valid(L.loopMs), max(L.loopMs), P.Ts*1e3);
 end
