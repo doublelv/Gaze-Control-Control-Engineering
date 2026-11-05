@@ -149,6 +149,8 @@ if useCam
     tLastFrame = NaN; Gs = [];
     useFace = strcmp(P.trk.source, 'face');      % follow the face box (no LEDs needed)
     fd = []; fbox = []; zFace = NaN; hFace = [];
+    tHist = nan(1, n); xHist = nan(1, n);         % carriage history for the camera-latency compensation
+    camLat = realtime*P.cam.latency;              % the virtual camera has no latency
     if useFace, fprintf('Following the FACE (P.trk.source = ''face'')\n'); end
 end
 if SHOW && useCam, V = viz_live_init(P, sprintf('run_rig %s (%s)', TASK, MODE)); end
@@ -170,6 +172,7 @@ for k = 1:n
     [io, fb] = rig_exchange(io, cmd);
     if fb.ok, y = yOf(fb); end
     xCar = y*M.r;
+    if useCam, tHist(k) = tNow; xHist(k) = xCar; end
 
     switch TASK
         case 'track_synthetic'
@@ -181,6 +184,14 @@ for k = 1:n
                 [cam, img, inf_] = camera_read(cam, P, ctx);
                 if inf_.ok
                     tFrame = tNow; if realtime, tFrame = toc(tk.t0); end
+                    % carriage position WHEN THE FRAME WAS TAKEN (not now): otherwise the
+                    % carriage's own motion appears as head motion -> oscillation
+                    xCam = xCar;
+                    if camLat > 0
+                        ih = max(1, k - 100):k; ih = ih(~isnan(tHist(ih)));
+                        tc = min(max(tFrame - camLat, tHist(ih(1))), tHist(ih(end)));
+                        if numel(ih) > 1, xCam = interp1(tHist(ih), xHist(ih), tc); end
+                    end
                     imgE = img;
                     if useFace                   % face first; pupils only inside the face
                         [fbox, fd] = face_find(fd, img, P, fbox);
@@ -188,14 +199,18 @@ for k = 1:n
                     end
                     det = eye_detect(imgE, P, eye_tracker_prior(T, tFrame, P));
                     [T, obs] = eye_tracker_update(T, det, tFrame, P);
-                    [H, T] = head_estimate(obs, T, xCar, P);
-                    if useFace, [H, zFace] = face_head(fbox, H, zFace, xCar, P); end
+                    [H, T] = head_estimate(obs, T, xCam, P);
+                    if useFace, [H, zFace] = face_head(fbox, H, zFace, xCam, P); end
                     dtf = tFrame - tLastFrame; if isnan(dtf), dtf = P.cam.every*P.Ts; end
                     tLastFrame = tFrame;
                     [kf, pHat, vHat] = eye_filter(kf, H.pos, dtf, P, H.valid);
                     if useFace, trackOk = H.valid; else, trackOk = ~any(strcmp(obs.status, {'search', 'lost'})); end
                     if ~any(isnan(pHat)) && trackOk
-                        refNow = refs_from_eye(P, pHat);
+                        refNew = refs_from_eye(P, pHat);
+                        if abs(refNew(1)*M.r - refNow(1)*M.r) < P.trk.deadband
+                            refNew(1) = refNow(1);   % dead band: ignore small head moves / jitter
+                        end
+                        refNow = refNew;
                         inside = refNow(1)*M.r > P.belt.xMin && refNow(1)*M.r < P.belt.xMax;
                         vFFraw = P.trk.useVelFF*inside*vHat(1)/M.r;
                     else
