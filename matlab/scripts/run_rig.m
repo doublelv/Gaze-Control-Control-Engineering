@@ -102,11 +102,12 @@ if strcmp(P.home.method, 'endstop'), xHome = P.belt.xMin; else, xHome = P.belt.x
 th0 = xHome/M.r;
 yOf = @(fb) th0 + (double(fb.count) - count0)*M.q;
 fprintf('Homed at count %d (x = %.0f mm)\n', count0, xHome*1e3);
+% start every task from the middle of the rail (the stall home is 0.3 m away)
+fprintf('Moving to the rail centre...\n');
+[io, y] = rig_move_to(io, 0.5*(P.belt.xMin + P.belt.xMax)/M.r, yOf, C, M, P, tk);
 
 %% ------------------------------------------------------------ sysid
 if strcmp(TASK, 'sysid')
-    fprintf('Moving to the rail centre...\n');
-    [io, y] = rig_move_to(io, 0.5*(P.belt.xMin + P.belt.xMax)/M.r, yOf, C, M, P, tk);
     cmd.duty = 0; tk.t0 = tic;
     for k = 1:round(0.5/P.Ts), [io, fb] = rig_exchange(io, cmd); rig_tick_wait(tk, k); end   % settle
     Vstep = 3; n = round(0.6/P.Ts);
@@ -146,7 +147,7 @@ if useCam
 end
 if SHOW && useCam, V = viz_live_init(P, sprintf('run_rig %s (%s)', TASK, MODE)); end
 
-y = yOf(fb);
+cmd.duty = 0; [io, fb] = rig_exchange(io, cmd); if fb.ok, y = yOf(fb); end   % fresh position (after the centring move)
 st = struct('I', C.Kp*(1 - P.bSP)*y, 'D', 0, 'yPrev', y);
 refPrev = y; tiltCmd = [0 0];
 refNow = [y; 0; 0]; vFF = 0; vFFraw = 0;

@@ -65,8 +65,11 @@ P.mot = mot;
 P.belt.r    = 40*2e-3/(2*pi);      % effective pulley radius [m] (12.7 mm)
 P.belt.mCar = 0.30;                % carriage + camera + illuminators [kg]  [PLACEHOLDER - weigh it]
 P.belt.Fc   = 2.0;                 % V-wheel rolling friction [N]          [PLACEHOLDER]
-P.belt.xMin = -0.15; P.belt.xMax = 0.15;   % usable travel (software limits) [m]  [PLACEHOLDER - rail length]
-P.belt.xStop = P.belt.xMin - 0.005;          % carriage position at the MIN mechanical stop [m] [MEASURE]
+%  Measured: the camera moves 0.65 m from the MIN stop to the MAX stop.
+%  x = 0 is the middle of the travel; 25 mm margin to each mechanical stop.
+P.belt.travel = 0.65;                        % stop to stop [m] (measured)
+P.belt.xStop = -P.belt.travel/2;             % carriage position at the MIN mechanical stop [m]
+P.belt.xMin = P.belt.xStop + 0.025; P.belt.xMax = -P.belt.xStop - 0.025;   % software limits [m]
 
 %% Homing. The team has ONE endstop -> mount it at the MIN end and home on it.
 %  Without it: P.home.method = 'stall' (drive slowly into the mechanical stop).
@@ -140,9 +143,12 @@ P.led.aim     = 'pan';                   % servo axis: 'pan' (vertical axis, as 
 %                 y = height of the LED above the camera lens (negative = below);
 %                 z = how far the LED is in front of the lens (toward the user).
 %   -> world position: see led_world_pos.m
-P.led.pos = [-0.03   0.60   -0.025  0.025;    % [PLACEHOLDER - measure]
-             -0.25  -0.25    0.000  0.000;    % [PLACEHOLDER - measure]
-              0.02   0.02    0.000  0.000];   % [PLACEHOLDER - measure]
+%  Measured: servo LEDs 26 cm above the table, lens 36.5 cm; each servo LED is
+%  8 cm outside the lens when the carriage is at that end; 0.5 cm in front.
+%  Camera LEDs 1.5 cm left/right of the lens, 1 cm in front.
+P.led.pos = [-0.080  P.belt.travel+0.080  -0.015  0.015;
+             -0.105  -0.105                 0.000  0.000;
+              0.005   0.005                 0.010  0.010];
 
 %% Cross-axis coupling: carriage acceleration -> disturbance on the servos.
 %  The servos are on the frame, not on the carriage -> no coupling.

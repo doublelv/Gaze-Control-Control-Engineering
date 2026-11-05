@@ -1,6 +1,6 @@
 function [io, y] = rig_move_to(io, target, yOf, C, M, P, tk)
 %RIG_MOVE_TO  Closed-loop move of the carriage to an output-shaft angle [rad]
-%   (used by run_rig TASK = 'sysid'). yOf: function fb -> angle. Moves at half
+%   (run_rig: to the rail centre after homing). yOf: function fb -> angle. Moves at half
 %   the maximum slew rate, stops within 1 mm or after 4 s.
 cmd = struct('duty', 0, 'servoUs', P.srv.zeroUs, 'led', false(1, P.led.n));
 [io, fb] = rig_exchange(io, cmd); y = yOf(fb);
