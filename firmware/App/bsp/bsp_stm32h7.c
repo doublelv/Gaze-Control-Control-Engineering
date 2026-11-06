@@ -6,6 +6,8 @@
  *   TIM3 CH1/CH2 PWM 50 Hz, 1 MHz tick                -> servo A/B
  *   USART3    921600 8N1, RX interrupt                -> ST-LINK VCP
  *   GPIO out: MOTOR_DIR, LED_1..LED_4   GPIO in: END_MIN (END_MAX optional)
+ *   LED_5 (PB15, CN7 pin 3, D17) and LED_6 (PA6, CN7 pin 12, D12) are set up
+ *   here in bsp_start(), so firmware.ioc does not need to be regenerated.
  * Compiled only on the target (USE_HAL_DRIVER is defined by CubeMX projects).
  */
 #ifdef USE_HAL_DRIVER
@@ -23,6 +25,30 @@ extern UART_HandleTypeDef huart3;
 
 static uint8_t rx_byte;
 
+/* second LED on each servo (added after the CubeMX project was generated) */
+#ifndef LED_5_Pin
+#define LED_5_Pin       GPIO_PIN_15
+#define LED_5_GPIO_Port GPIOB
+#endif
+#ifndef LED_6_Pin
+#define LED_6_Pin       GPIO_PIN_6
+#define LED_6_GPIO_Port GPIOA
+#endif
+
+static void led56_init(void)
+{
+    GPIO_InitTypeDef g = {0};
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    HAL_GPIO_WritePin(LED_5_GPIO_Port, LED_5_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_6_GPIO_Port, LED_6_Pin, GPIO_PIN_RESET);
+    g.Mode  = GPIO_MODE_OUTPUT_PP;
+    g.Pull  = GPIO_NOPULL;
+    g.Speed = GPIO_SPEED_FREQ_LOW;
+    g.Pin = LED_5_Pin; HAL_GPIO_Init(LED_5_GPIO_Port, &g);
+    g.Pin = LED_6_Pin; HAL_GPIO_Init(LED_6_GPIO_Port, &g);
+}
+
 void bsp_start(void)
 {
     /* microsecond clock from the DWT cycle counter */
@@ -30,6 +56,8 @@ void bsp_start(void)
     DWT->LAR = 0xC5ACCE55;
     DWT->CYCCNT = 0;
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+
+    led56_init();
 
     HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
     __HAL_TIM_SET_COUNTER(&htim2, 0);
@@ -56,6 +84,8 @@ void bsp_led_write(uint8_t mask)
     HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, (mask & 2u) ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, (mask & 4u) ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_4_GPIO_Port, LED_4_Pin, (mask & 8u) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_5_GPIO_Port, LED_5_Pin, (mask & 16u) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_6_GPIO_Port, LED_6_Pin, (mask & 32u) ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
 int32_t bsp_encoder_read(void) { return (int32_t)__HAL_TIM_GET_COUNTER(&htim2); }

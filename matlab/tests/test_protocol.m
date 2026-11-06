@@ -3,6 +3,7 @@ function test_protocol()
 %   every valid vector must encode to the same bytes and decode to the same
 %   fields; every BAD vector must be rejected.
 P = params(); C = proto_const();
+P.led.twin = zeros(1, 4);   % raw LED mask: the shared vectors have no twin LEDs
 V = read_vectors();
 assert(numel(V) >= 12, 'too few vectors');
 for v = V

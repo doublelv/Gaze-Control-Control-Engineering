@@ -55,11 +55,13 @@ ST NUCLEO-H753ZI (MB1364E) Zio pinout picture: D8 is PF3 on this board, not PF12
 | CN7 pin | Board label | MCU pin | Signal |
 |---|---|---|---|
 | 1 | D16 | PC6 | Servo 1 (TIM3_CH1) |
+| 3 | D17 | PB15 | IR LED 5 (`LED_5`, second LED on servo 1; set up in `bsp_start`, not in the .ioc) |
 | 2 | D15 | PB8 | Motor PWM -> MDD10A PWM1 (TIM4_CH3) |
 | 4 | D14 | PB9 | Motor DIR -> MDD10A DIR1 (`MOTOR_DIR`) |
 | 7 | D19 | PB12 | Endstop MIN signal (`END_MIN`) |
 | 8 | GND | GND | Common ground (MDD10A GND, LED/servo 5 V supply GND) |
 | 10 | D13 | PA5 | Encoder A (TIM2_CH1) |
+| 12 | D12 | PA6 | IR LED 6 (`LED_6`, second LED on servo 2; set up in `bsp_start`, not in the .ioc) |
 | 11 | D21 | PC7 | Servo 2 (TIM3_CH2) |
 | 15 | D23 | PB3 | Encoder B (TIM2_CH2) |
 | 16 | D10 | PD14 | IR LED 3 (`LED_3`) |
@@ -67,7 +69,7 @@ ST NUCLEO-H753ZI (MB1364E) Zio pinout picture: D8 is PF3 on this board, not PF12
 | 18 | D9 | PD15 | IR LED 2 (`LED_2`) |
 | 20 | D8 | PF3 | IR LED 1 (`LED_1`) |
 
-Unused on CN7: 3 (PB15), 5 (PB13, Ethernet), 6 (VREF), 9 (PA15), 12 (PA6), 13 and 14 (both PB5), 19 (PB4).
+Unused on CN7: 5 (PB13, Ethernet), 6 (VREF), 9 (PA15), 13 and 14 (both PB5), 19 (PB4).
 
 CN8 (power only): pin 7 = 3V3 (encoder VCC, endstop +), pin 9 = 5V, pins 11/13 = GND.
 Servos and IR LEDs are powered from the buck 5 V, not from the Nucleo; only their GND is shared.
