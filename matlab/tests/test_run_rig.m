@@ -16,6 +16,15 @@ e = (r.L.ref(1,:) - r.L.y)*r.M.r*1e3;
 % (+-80 mm sine at 0.3 Hz + a 50 mm jump) gives ~45 mm RMS lag; tighten after
 % the loop speed-up (faster loop -> higher bandwidth).
 assert(sqrt(mean(e(r.L.t > 1).^2)) < 60, 'carriage tracking RMS %.1f mm', sqrt(mean(e(r.L.t > 1).^2)));
+% step test (TASK = 'step'): first +50 mm step at t = 3 s, overshoot < 5 %, settled < 1.5 s
+% (settled = within 5 % or within the hold band, where the motor is switched off on purpose)
+r = run_task('step', 6);
+k = find(r.L.tReal >= 3 & r.L.tReal < 6);
+y0 = r.L.ref(1, k(1) - 1); ys = (r.L.y(k) - y0)*r.M.r; sz = r.P.stepTest.size;
+sm = step_metrics(r.L.tReal(k) - 3, ys, 0, sz);
+iout = find(abs(ys - sz) > max(0.05*sz, r.P.trk.holdBand + 0.5e-3), 1, 'last'); ts = r.L.tReal(k(min(iout + 1, end))) - 3;
+assert(sm.OS < 5, 'step overshoot %.1f %%', sm.OS);
+assert(ts < 1.5, 'step settling %.2f s', ts);
 % same 1 Hz limit as above: the camera lags the moving synthetic head (~50 mm RMS)
 r = run_task('track_camera', 5);
 ok = ~isnan(r.L.head(1,:)) & r.L.t > 2;
