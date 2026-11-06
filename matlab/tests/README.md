@@ -1,6 +1,6 @@
 # matlab/tests
 
-`run_all_tests` (MATLAB or Octave, from this folder) runs every `test_*.m`:
+All files here are SIM (tests only). `run_all_tests` (MATLAB or Octave, from this folder) runs every `test_*.m`:
 
 | Test | Checks |
 |---|---|
@@ -11,7 +11,7 @@
 | `test_tracker` | camera -> tracker -> head on the moving synthetic scene (lock, blinks, x/z/roll errors) |
 | `test_gaze` | headless synthetic calibration, leave-one-out and new-target errors, save/load |
 | `test_pid_design` | phase / gain margins |
-| `test_run_rig` | the `run_rig` script in virtual mode: io_check, track_synthetic, track_camera |
+| `test_run_rig` | the `run_rig` script in virtual mode: io_check, track_synthetic, step (overshoot < 5 %, settling < 1.5 s), track_camera (eyes and face) |
 
 Fixtures are synthetic (rendered faces, generated vectors); no personal recordings.
 Tests ignore `config/local/params_local.m`. Hardware results are reported separately.

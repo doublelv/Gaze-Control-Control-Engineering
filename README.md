@@ -5,15 +5,21 @@ A 3-axis eye-tracking rig: a camera carriage driven by a DC motor on a belt foll
 head, two pan servos on the frame turn IR LEDs toward the eyes, and MATLAB tracks the pupils, the head and
 (after calibration) the gaze point on the screen.
 
-**Status:** complete software (MATLAB + STM32 firmware). All offline tests pass (Octave + gcc,
-see CI). **Not yet run on the hardware.** Values marked `[PLACEHOLDER]` / `[CHECK]` in
-`matlab/config/params.m` and `firmware/App/config.h` must be measured on the rig.
+**Status (2026-11-06):**
+- Runs on the rig: firmware, link, stall homing at both ends, safety checks, open-loop
+  identification (`sysid`) and **face tracking** (`run_rig`, `TASK='track_camera'`, `P.trk.source='face'`).
+- Not yet done on the rig: IR LEDs (not mounted), eye/pupil tracking and gaze calibration with the
+  LEDs, servo 1 (not wired), servo aiming, the step test (`TASK='step'`), and the retuned carriage
+  controller in `params.m` (zeta 1.5, b = 0.6; so far checked in simulation only).
+- All offline tests pass (MATLAB/Octave + gcc, see CI). Values marked `[PLACEHOLDER]` / `[CHECK]` in
+  `matlab/config/params.m` and `firmware/App/config.h` are still unmeasured.
 
-## Quick start (no hardware)
-In MATLAB, Current Folder = `matlab/scripts`, then run:
-- `run_eye_demo`: eye + head tracking on a synthetic face (set `SOURCE = 'webcam'` for the OV9281)
-- `run_rig`: complete rig in virtual mode (simulated Nucleo, motor and camera)
-- `run_calibration`: gaze calibration with a virtual user
+## Quick start
+In MATLAB, Current Folder = `matlab/scripts`.
+- No hardware: `run_rig` with `MODE='virtual'` (simulated Nucleo, motor and camera), `run_eye_demo`
+  with the synthetic face, `run_all_tests` in `matlab/tests`.
+- On the rig: plug in the Nucleo USB first, then the 12 V supply, then `run_rig` with `MODE='serial'`.
+  Which files are used on the rig and which only in simulation/tests: `matlab/README.md` (status legend).
 
 ## Repository
 | Folder | Content |
@@ -26,8 +32,9 @@ In MATLAB, Current Folder = `matlab/scripts`, then run:
 | `.github/workflows/` | CI: firmware host tests + MATLAB tests in Octave |
 
 ## Hardware
-NUCLEO-H753ZI, MDD10A + FIT0186 geared motor with encoder, GT2 belt on 2020 V-slot,
-2 x SER0006 servos, 4 x 850 nm IR LEDs, OV9281 USB camera (1.65 mm lens), Mean Well 12 V.
+NUCLEO-H753ZI, Cytron MD10C + FIT0186 geared motor with encoder, GT2 belt on 2020 V-slot,
+2 x SER0006 servos, 850 nm IR LEDs (not mounted yet), OV9281 USB camera (1.65 mm lens), Mean Well 12 V.
+No endstop is fitted: homing is done by stalling at both mechanical stops.
 Details and wiring: `docs/hardware/hardware.md`.
 
 ## Tests
