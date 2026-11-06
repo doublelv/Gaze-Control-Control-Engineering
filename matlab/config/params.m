@@ -121,8 +121,9 @@ ax(1) = struct('name','Camera X (linear)','type','dc','r',r, ...
 %  zeta 1.5: at 1 Hz the design gives Kd < 0 -> PI only; the higher zeta raises Kp
 %  (1.48 -> 2.28 V/rad). With set-point weight b = 0.6 (P.trk.bSP) a 50 mm step then
 %  has < 3 % overshoot and ~1 s settling (5 %) for loops of 20-56 ms in the model
-%  (make_paper_figures, compare_log_sim); zeta 0.8 / b = 1 gave ~30 % overshoot.
-%  vmax: carriage at most 0.20 m/s (tuned on the rig: faster made the face tracking overshoot)
+%  (make_paper_figures, compare_log_sim). Model only, not yet run on the rig;
+%  the rig ran zeta 0.8 / b = 1, for which the model predicts ~40 % overshoot.
+%  vmax: carriage at most 0.20 m/s (value set on the rig)
 ax(2) = struct('name','Illum A (pan)','type','servo','r',0,'JL',2e-6,'bL',0,'Tc',0, ...
                'm',0,'l',0,'bwHz',NaN,'zeta',NaN,'alpha',NaN,'vmax',3);
 ax(3) = struct('name','Illum B (pan)','type','servo','r',0,'JL',2e-6,'bL',0,'Tc',0, ...
@@ -193,7 +194,7 @@ P.cam.W     = 1280;
 P.cam.H     = 720;
 P.cam.fps   = 120;
 P.cam.zEye  = 0.60;                 % fallback eye distance if both eyes are not seen [m]
-P.cam.latency = 0.10;               % exposure + MJPG + USB + decode [s] (tuned on the rig: no more sway at 0.10 s)
+P.cam.latency = 0.10;               % exposure + MJPG + USB + decode [s] (value set on the rig, not measured)
 %  (run_rig serial: the carriage position at t - latency is used for each frame)
 P.cam.sigmaPx = 0.5;                % pupil-centre noise [px]               [PLACEHOLDER]
 P.cam.zRelErr = 0.05;               % distance estimate error (from eye spacing) [-]
@@ -258,9 +259,9 @@ P.head.zAlpha     = 0.2;     % low-pass on the distance from the eye spacing
 
 %% Eye-tracking software options (to recover performance with the wide lens)
 P.trk.useFilter = true;     % Kalman filter on the eye position (+ velocity)
-P.trk.useVelFF  = false;    % carriage velocity feed-forward from the filter (off: face box too noisy)
+P.trk.useVelFF  = false;    % carriage velocity feed-forward from the filter (off on the rig)
 P.trk.qAcc      = 0.5;      % filter process noise: head acceleration PSD [(m/s^2)^2/Hz] (tuned)
-P.trk.bSP       = 0.6;      % set-point weight in run_rig tracking + step test (1 = none: ~30 % overshoot)
+P.trk.bSP       = 0.6;      % set-point weight in run_rig tracking + step test (1 = none; model: ~40 % overshoot)
 P.trk.jumpGate  = 4;        % innovation > jumpGate*sigma + jumpMin = jump, no velocity update
 P.trk.jumpMin   = 0.001;    % [m]
 P.trk.vffTau    = 0.15;     % low-pass on the velocity feed-forward [s] (saccades, noise)
