@@ -4,6 +4,7 @@ function test_gaze()
 %   over the whole screen, so the bounds are in degrees, not pixels:
 %   leave-one-out < 6 deg, median error on new targets < 7 deg.
 P = params(); P.cam.source = 'synthetic'; rng(21);
+P.led.on = [0 0 1 1];   % camera LEDs only: the frame LEDs' glints bias the gaze feature
 cam = camera_open(P, synth_scene(P, 'calib', [0; 0.2; 0]));
 [V, X, info] = gaze_calib_collect(P, cam, struct('show', false));
 assert(all(info.n(:) >= P.gcal.minSamples), 'too few calibration samples');

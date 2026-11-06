@@ -53,7 +53,10 @@ it to switch off). If MATLAB reports "No HELLO reply": press RESET on the Nucleo
 | 6. LEDs mounted: `run_eye_demo` (`SOURCE='webcam'`), `tune_detector`, `run_calibration`, `P.trk.source='eyes'` | to do |
 
 ## Data flow
-Face mode (used now): camera -> `face_find` (Viola-Jones) -> `face_mask` -> `face_head`
+Both (default, `P.trk.source='both'`): face mode below, then the eye chain inside the face box;
+the eyes are followed while both pupils are tracked, otherwise the face.
+
+Face mode: camera -> `face_find` (Viola-Jones) -> `face_mask` -> `face_head`
 (head x, distance) -> `eye_filter` -> `refs_from_eye` -> `pid_step` -> `rig_exchange` -> Nucleo.
 
 Eye mode (with LEDs): camera -> `eye_detect` (pupils, glints) -> `eye_tracker_update` (left/right, blink, lost) ->

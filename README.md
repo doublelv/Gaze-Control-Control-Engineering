@@ -8,7 +8,9 @@ head, two pan servos on the frame turn IR LEDs toward the eyes, and MATLAB track
 **Status (2026-11-06):**
 - Runs on the rig: firmware, link, stall homing at both ends, safety checks, open-loop
   identification (`sysid`) and **face tracking** (`run_rig`, `TASK='track_camera'`, `P.trk.source='face'`).
-- Not yet done on the rig: IR LEDs (not mounted), eye/pupil tracking and gaze calibration with the
+- IR LEDs mounted (2026-11-06, on both servos and next to the camera); `P.trk.source='both'`
+  (eyes inside the face box, else the face) is the default but not yet run on the rig.
+- Not yet done on the rig: eye/pupil tracking and gaze calibration with the
   LEDs, servo 1 (not wired), servo aiming, the step test (`TASK='step'`), and the retuned carriage
   controller in `params.m` (zeta 1.5, b = 0.6; so far checked in simulation only).
 - All offline tests pass (MATLAB/Octave + gcc, see CI). Values marked `[PLACEHOLDER]` / `[CHECK]` in
@@ -33,7 +35,7 @@ In MATLAB, Current Folder = `matlab/scripts`.
 
 ## Hardware
 NUCLEO-H753ZI, Cytron MD10C + FIT0186 geared motor with encoder, GT2 belt on 2020 V-slot,
-2 x SER0006 servos, 850 nm IR LEDs (not mounted yet), OV9281 USB camera (1.65 mm lens), Mean Well 12 V.
+2 x SER0006 servos, 850 nm IR LEDs, OV9281 USB camera (1.65 mm lens), Mean Well 12 V.
 No endstop is fitted: homing is done by stalling at both mechanical stops.
 Details and wiring: `docs/hardware/hardware.md`.
 

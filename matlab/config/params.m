@@ -80,7 +80,8 @@ P.belt.xMin = P.belt.xStop + P.belt.margin; P.belt.xMax = -P.belt.xStop - P.belt
 %  Without it: P.home.method = 'stall' (drive slowly into the mechanical stop).
 P.home.method = 'stall';    % 'endstop' | 'stall'
 P.home.duty   = 0.2;          % fraction of 12 V while homing (2.4 V, ~1.4 A at stall)
-P.home.tStall = 0.2;          % encoder still for this long = at the stop [s]
+P.home.tStall = 0.1;          % encoder still for this long = at the stop [s] (short: light touch)
+P.home.tBack  = 0.15;         % after each stop: drive back this long so it does not stay pressed [s]
 P.home.bothEnds  = true;      % stall homing: MIN stop, then MAX stop -> measured travel, limits centred on it
 P.home.travelTol = 0.05;      % measured travel must be within this of P.belt.travel, else STOP [m]
 P.home.tCheck = 0.3;          % pre-check: push toward MAX this long before homing [s]
@@ -141,11 +142,11 @@ P.led.Rser = 68;  P.led.Prated = 0.25;                     % Yageo MFR-25 68R
 P.led.n    = 4;    % schematic: 4 IR LEDs, each 68R + NPN switch (470R base, 10k pull-down)
 %   LED i = J10 'IR LED i' = Nucleo LED_i (PF3, PD15, PD14, PA4) = schematic D(5-i)
 %   (J10 'IR LED 1' drives D4 ... 'IR LED 4' drives D1). See docs/hardware/hardware.md.
-P.led.on   = [0 0 1 1];  % which LEDs to switch on (calibration, demo and tracking)
+P.led.on   = [1 1 1 1];  % which LEDs to switch on (calibration, demo and tracking)
 %  NOTE: the gaze feature uses the centroid of ALL glints. The frame LEDs (1, 2)
 %  do not move with the camera, so their glints shift when the head moves
-%  sideways -> gaze bias (test_gaze fails with [1 1 1 1]). Default: camera LEDs
-%  only. For a servo demo set [1 1 1 1] in params_local.m (and recalibrate).
+%  sideways -> gaze bias (test_gaze uses [0 0 1 1]). If the gaze point is off,
+%  try P.led.on = [0 0 1 1] in params_local.m and recalibrate.
 %
 %  LED layout (as built): LED 1, 2 on the pan servos on the two legs of the
 %  U-frame (fixed to the frame); LED 3, 4 fixed next to the camera on the carriage.
@@ -245,7 +246,9 @@ P.trk.vHeadMax    = 0.5;     % max head speed, widens the gate while an eye is u
 %  'eyes': pupil pair (needs the IR LEDs: dark pupil + glints)
 %  'face': face box (Viola-Jones, Computer Vision Toolbox) -> works in room light
 %          without LEDs; the pupil detector then only searches inside the face.
-P.trk.source = 'face';      % as used now (IR LEDs not mounted yet); 'eyes' once they are
+%  'both': face box first, pupils searched inside it; the eyes are followed while
+%          both pupils are tracked, otherwise the face (live view: 'follows').
+P.trk.source = 'both';
 P.face.width      = 0.15;    % real width of the detected face box [m]  [CHECK: z shown vs. tape measure]
 P.face.eyeLevel   = 0.40;    % eye height inside the box, from the top (fraction of box height)
 P.face.scale      = 1/3;     % detect on a downscaled frame (speed): 1/2, 1/3, ... (every k-th pixel)

@@ -2,7 +2,9 @@ function [io, fb, ok] = rig_home_stall(io, P, sgn, tk)
 %RIG_HOME_STALL  Drive slowly into a mechanical stop until the encoder stops.
 %   sgn : -1 = toward MIN, +1 = toward MAX.  Duty P.home.duty, timeout 20 s.
 %   Stall = count unchanged (+-1) for P.home.tStall after at least 0.3 s.
-%   fb  : STATE after the motor was switched off (count at the stop).
+%   Then it backs off for P.home.tBack (if set) so the carriage does not stay
+%   pressed against the stop.
+%   fb  : STATE at the stop (motor just switched off), before the back-off.
 cmd = struct('duty', sgn*P.home.duty*P.drv.pwmCounts, 'servoUs', P.srv.zeroUs, 'led', false(1, P.led.n));
 ok = false; nStill = 0; lastCnt = NaN; tk.t0 = tic;
 for k = 1:round(20/P.Ts)
@@ -15,4 +17,9 @@ for k = 1:round(20/P.Ts)
     rig_tick_wait(tk, k);
 end
 cmd.duty = 0; [io, fb] = rig_exchange(io, cmd);
+if ok && isfield(P.home, 'tBack') && P.home.tBack > 0
+    cmd.duty = -sgn*P.home.duty*P.drv.pwmCounts; tk.t0 = tic;
+    for k = 1:round(P.home.tBack/P.Ts), io = rig_exchange(io, cmd); rig_tick_wait(tk, k); end
+    cmd.duty = 0; io = rig_exchange(io, cmd);
+end
 end
