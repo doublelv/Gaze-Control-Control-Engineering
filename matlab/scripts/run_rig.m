@@ -30,6 +30,7 @@ if ~isempty(getenv('RIG_TRUN')), TRUN = str2double(getenv('RIG_TRUN')); end
 if ~isempty(getenv('RIG_SHOW')), SHOW = strcmp(getenv('RIG_SHOW'), '1'); end
 
 P = params();
+if ~isempty(getenv('RIG_SOURCE')), P.trk.source = getenv('RIG_SOURCE'); end   % tests: 'eyes' | 'face'
 if ~isempty(getenv('RIG_FACE_STUB'))             % tests: face mode with a stand-in detector
     P.trk.source = 'face'; P.face.detectFcn = str2func(getenv('RIG_FACE_STUB'));
 end
