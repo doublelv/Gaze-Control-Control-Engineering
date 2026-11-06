@@ -78,6 +78,8 @@ P.belt.xMin = P.belt.xStop + P.belt.margin; P.belt.xMax = -P.belt.xStop - P.belt
 P.home.method = 'stall';    % 'endstop' | 'stall'
 P.home.duty   = 0.2;          % fraction of 12 V while homing (2.4 V, ~1.4 A at stall)
 P.home.tStall = 0.2;          % encoder still for this long = at the stop [s]
+P.home.bothEnds  = true;      % stall homing: MIN stop, then MAX stop -> measured travel, limits centred on it
+P.home.travelTol = 0.05;      % measured travel must be within this of P.belt.travel, else STOP [m]
 P.home.tCheck = 0.3;          % pre-check: push toward MAX this long before homing [s]
 P.home.minCheckCounts = 100;  % ... and the encoder must count up at least this much (~3 mm)
 P.endstops   = [false false];  % [MIN MAX] wired? must match USE_END_MIN / USE_END_MAX in the firmware

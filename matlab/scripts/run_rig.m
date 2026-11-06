@@ -104,29 +104,43 @@ end
 
 %% ------------------------------------------------------------ homing
 fprintf('Homing (%s)...\n', P.home.method);
-cmd.duty = -P.home.duty*P.drv.pwmCounts;
-homed = false; nStill = 0; lastCnt = NaN; tk.t0 = tic;
-for k = 1:round(20/P.Ts)
-    [io, fb] = rig_exchange(io, cmd);
-    if fb.ok
-        if strcmp(P.home.method, 'endstop')
-            if fb.endMin, homed = true; break, end
-        else
-            if ~isnan(lastCnt) && abs(double(fb.count) - lastCnt) <= 1, nStill = nStill + 1; else, nStill = 0; end
-            lastCnt = double(fb.count);
-            if k*P.Ts > 0.3 && nStill >= round(P.home.tStall/P.Ts), homed = true; break, end
-        end
+if strcmp(P.home.method, 'endstop')
+    cmd.duty = -P.home.duty*P.drv.pwmCounts;
+    homed = false; tk.t0 = tic;
+    for k = 1:round(20/P.Ts)
+        [io, fb] = rig_exchange(io, cmd);
+        if fb.ok && fb.endMin, homed = true; break, end
+        rig_tick_wait(tk, k);
     end
-    rig_tick_wait(tk, k);
+    cmd.duty = 0; [io, fb] = rig_exchange(io, cmd);
+else
+    [io, fb, homed] = rig_home_stall(io, P, -1, tk);          % MIN end (right)
 end
-cmd.duty = 0; [io, fb] = rig_exchange(io, cmd);
 if ~homed, error('run_rig:homing', 'Homing failed after 20 s (endstop not reached?)'); end
 count0 = double(fb.count);
+if strcmp(P.home.method, 'stall') && P.home.bothEnds
+    % second stop: measure the real travel, recentre the limits on it
+    fprintf('Homed MIN at count %d. Homing the MAX end (measuring the travel)...\n', count0);
+    [io, fbMax, ok2] = rig_home_stall(io, P, +1, tk);
+    if ~ok2, error('run_rig:homing', 'MAX end not reached after 20 s'); end
+    travelM = (double(fbMax.count) - count0)*M.q*M.r;
+    fprintf('Measured travel %.0f mm (expected %.0f mm)\n', travelM*1e3, P.belt.travel*1e3);
+    if abs(travelM - P.belt.travel) > P.home.travelTol
+        error('run_rig:travel', ['Measured travel %.0f mm differs from P.belt.travel = %.0f mm by more than %.0f mm: ', ...
+              'belt slipping, encoder losing counts, or something blocking the carriage? ', ...
+              '(If the rail really changed, set P.belt.travel.)'], travelM*1e3, P.belt.travel*1e3, P.home.travelTol*1e3);
+    end
+    fr = logical(P.led.onFrame) & P.led.pos(1,:) > P.belt.travel/2;   % frame LEDs at the MAX end
+    P.led.pos(1, fr) = P.led.pos(1, fr) + (travelM - P.belt.travel);
+    P.belt.travel = travelM;
+    P.belt.xStop = -travelM/2;
+    P.belt.xMin = P.belt.xStop + P.belt.margin; P.belt.xMax = -P.belt.xStop - P.belt.margin;
+end
 if strcmp(P.home.method, 'endstop'), xHome = P.belt.xMin; else, xHome = P.belt.xStop; end
 th0 = xHome/M.r;
 yOf = @(fb) th0 + (double(fb.count) - count0)*M.q;
 fprintf('Homed at count %d (x = %.0f mm)\n', count0, xHome*1e3);
-% start every task from the middle of the rail (the stall home is 0.3 m away)
+% start every task from the middle of the rail
 fprintf('Moving to the rail centre...\n');
 [io, y] = rig_move_to(io, 0.5*(P.belt.xMin + P.belt.xMax)/M.r, yOf, C, M, P, tk);
 
