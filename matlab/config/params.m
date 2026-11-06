@@ -78,6 +78,8 @@ P.belt.xMin = P.belt.xStop + P.belt.margin; P.belt.xMax = -P.belt.xStop - P.belt
 P.home.method = 'stall';    % 'endstop' | 'stall'
 P.home.duty   = 0.2;          % fraction of 12 V while homing (2.4 V, ~1.4 A at stall)
 P.home.tStall = 0.2;          % encoder still for this long = at the stop [s]
+P.home.tCheck = 0.3;          % pre-check: push toward MAX this long before homing [s]
+P.home.minCheckCounts = 100;  % ... and the encoder must count up at least this much (~3 mm)
 P.endstops   = [false false];  % [MIN MAX] wired? must match USE_END_MIN / USE_END_MAX in the firmware
 
 %% SER0006 micro servo (DFRobot / Farnell): 4.8-6 V, 0.156 Nm @6 V
@@ -250,6 +252,7 @@ P.trk.jumpGate  = 4;        % innovation > jumpGate*sigma + jumpMin = jump, no v
 P.trk.jumpMin   = 0.001;    % [m]
 P.trk.vffTau    = 0.15;     % low-pass on the velocity feed-forward [s] (saccades, noise)
 P.trk.deadband  = 0;        % carriage reference only changes if the head moved more than this [m]
+P.trk.maxErr    = 0.06;     % |reference - carriage| above this for 1 s (at once in rig_move_to) = runaway -> STOP [m]
 P.trk.holdBand  = 0;        % track_camera: motor off while the target is still and |error| < this [m]
 
 %% Head / eye motion scenario

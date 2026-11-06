@@ -11,6 +11,11 @@ for k = 1:round(4/P.Ts)
     [V, st] = pid_step(st, C, M, P, ref, y);
     cmd.duty = V/M.Vmax*P.drv.pwmCounts;
     [io, fb] = rig_exchange(io, cmd); if fb.ok, y = yOf(fb); end
+    if abs(ref - y)*M.r > P.trk.maxErr                % cannot follow a slow ramp -> something is wrong
+        cmd.duty = 0; rig_exchange(io, cmd);
+        error('rig_move_to:runaway', ['Carriage %.0f mm away from its reference -> STOPPED. ', ...
+              'Encoder not counting, wires swapped, or carriage blocked? Check with TASK = ''io_check''.'], abs(ref - y)*M.r*1e3);
+    end
     rig_tick_wait(tk, k);
     if abs(target - y)*M.r < 1e-3 && abs(target - ref) < eps, break, end
 end

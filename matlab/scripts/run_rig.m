@@ -81,6 +81,27 @@ if strcmp(TASK, 'io_check')
     return
 end
 
+%% ------------------------------------------------------------ pre-check
+% Short push toward MAX: the encoder must count UP. Catches a dead/unplugged
+% encoder, missing 12 V, or swapped motor/encoder wires BEFORE anything moves far
+% (otherwise homing "stalls" at once and the PID runs away).
+fprintf('Pre-check: short move toward MAX...\n');
+[io, fb] = rig_exchange(io, cmd); c0 = double(fb.count); tk.t0 = tic;
+cmd.duty = P.home.duty*P.drv.pwmCounts;
+for k = 1:round(P.home.tCheck/P.Ts), [io, fb] = rig_exchange(io, cmd); rig_tick_wait(tk, k); end
+cmd.duty = 0; [io, fb] = rig_exchange(io, cmd);
+for k = 1:round(0.2/P.Ts), [io, fb] = rig_exchange(io, cmd); rig_tick_wait(tk, k); end   % let it stop
+dcChk = double(fb.count) - c0;
+fprintf('  moved %+d counts (%+.1f mm)\n', round(dcChk), dcChk*M.q*M.r*1e3);
+if dcChk < -P.home.minCheckCounts
+    error('run_rig:direction', ['Motor drove toward MAX but the encoder counted DOWN (%+d). ', ...
+          'Motor or encoder wires are swapped. Check with TASK = ''io_check''.'], round(dcChk));
+elseif dcChk < P.home.minCheckCounts
+    error('run_rig:noMotion', ['Encoder changed only %+d counts during the pre-check move. ', ...
+          'Is the 12 V supply on? Is the encoder cable (and its power) plugged in? ', ...
+          'Is the carriage already at the MAX (left) end? Check with TASK = ''io_check''.'], round(dcChk));
+end
+
 %% ------------------------------------------------------------ homing
 fprintf('Homing (%s)...\n', P.home.method);
 cmd.duty = -P.home.duty*P.drv.pwmCounts;
@@ -164,7 +185,7 @@ L = struct('task', TASK, 'mode', MODE, 't', t, 'ref', nan(3, n), 'y', nan(1, n),
            'gaze', nan(2, n), 'frameMs', nan(1, n), 'nOverrun', 0, 'nGuard', 0);
 codes = {'search', 'track', 'blink', 'lost'};
 fprintf('Running %s for %.0f s (%s). Close the window or Ctrl-C to stop.\n', TASK, TRUN, MODE);
-tk.t0 = tic; tPrevLoop = 0;
+tk.t0 = tic; tPrevLoop = 0; tBigErr = 0;
 for k = 1:n
     tNow = toc(tk.t0);
     if ~realtime, tNow = t(k); end
@@ -258,6 +279,13 @@ for k = 1:n
         [Vm, st] = pid_step(st, C, M, P, ref(1), y, Vff, dt);
     end
     if ~fb.ok, Vm = 0; end                                       % no fresh encoder value: coast
+    % runaway check: the carriage cannot follow its (slew-limited) reference
+    if fb.ok && abs(ref(1) - y)*M.r > P.trk.maxErr, tBigErr = tBigErr + max(dt, P.Ts); else, tBigErr = 0; end
+    if tBigErr > 1.0
+        cmd.duty = 0; rig_exchange(io, cmd);
+        error('run_rig:runaway', 'Carriage %.0f mm away from its reference for 1 s -> STOPPED (encoder? wiring? blocked?)', ...
+              abs(ref(1) - y)*M.r*1e3);
+    end
     % encoder guard: past a software limit, never drive further outward (overshoot, stalls)
     if (xCar >= P.belt.xMax && Vm > 0) || (xCar <= P.belt.xMin && Vm < 0)
         Vm = 0; st.I = 0;                        % and drop the wound-up integrator
