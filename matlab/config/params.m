@@ -13,11 +13,14 @@ function P = params()
 
 %% Timing / architecture
 %  'matlab' : PID runs in MATLAB on the PC, Nucleo is only an I/O bridge over
-%             USB serial (team choice). 100 Hz loop, USB adds delay.
+%             USB serial (team choice). 50 Hz loop, USB adds delay.
 %  'nucleo' : PID runs on the Nucleo at 1 kHz (for comparison).
 P.loopMode   = 'matlab';
 if strcmp(P.loopMode, 'matlab')
-    P.Ts = 10e-3;  bwCam = 2;     % 2 Hz keeps PM ~40 deg with 15 ms total delay
+    % Measured on the rig: loop median ~46 ms (camera + face detection), so
+    % 20 ms is the target and 1 Hz the bandwidth that stays calm at that rate.
+    % (At 1 Hz design_pid warns "Kd < 0": the motor's own damping is enough.)
+    P.Ts = 20e-3;  bwCam = 1;
 else
     P.Ts = 1e-3;   bwCam = 6;
 end
@@ -52,7 +55,7 @@ mot.Kt   = KeOut/N;                 % motor-side (ideal Kt = Ke in SI)
 mot.eta  = KtOut/KeOut;             % gearbox efficiency (~0.58)
 mot.T0   = KtOut*0.35;              % no-load friction torque at output [Nm]
 mot.L    = 1.0e-3;                  % [H]          [PLACEHOLDER - measure with LCR meter]
-mot.Jm   = 1.5e-6;                  % rotor inertia [kg m^2] [PLACEHOLDER - identify, see sysid_step.m]
+mot.Jm   = 1.08e-6;                 % rotor inertia [kg m^2] (identified on the rig, run_rig TASK = 'sysid')
 mot.bm   = 0;                       % viscous part folded into T0
 mot.Vmax = P.psu.V;
 mot.cpr  = 2800/N;                   % counts per MOTOR rev so that output = 700 CPR [CHECK x1/x4]
@@ -96,8 +99,10 @@ srv.framePer = 20e-3;              % 50 Hz
 srv.Kin      = 40;                 % internal loop gain [1/s]     [PLACEHOLDER]
 srv.tauW     = 0.015;              % speed lag [s]                [PLACEHOLDER]
 srv.usRes    = 1;                  % STM32 timer gives <=1 us easily
-srv.zeroUs   = [1500 1500];        % pulse [us] at which each LED points straight ahead (+z, at the user) [CALIBRATE]
-srv.dir      = [1 1];              % +1 if a longer pulse turns the LED toward +x (MAX side), else -1   [CALIBRATE]
+srv.zeroUs   = [1500 1830];        % pulse [us] at which each LED points straight ahead (+z, at the user)
+                                   %   servo 1 (PC6): not wired yet [CALIBRATE]; servo 2 (PC7): 1830 estimated [CHECK aim]
+srv.dir      = [1 -1];             % +1 if a longer pulse turns the LED toward +x (MAX side), else -1
+                                   %   servo 1 [CALIBRATE]; servo 2 measured -1
 P.srv = srv;
 
 %% Axes
@@ -112,7 +117,8 @@ ax = struct('name',{}, 'type',{}, 'r',{}, 'JL',{}, 'bL',{}, 'Tc',{}, 'm',{}, 'l'
             'bwHz',{}, 'zeta',{}, 'alpha',{}, 'vmax',{});
 ax(1) = struct('name','Camera X (linear)','type','dc','r',r, ...
                'JL',P.belt.mCar*r^2,'bL',0,'Tc',mot.T0 + P.belt.Fc*r, ...
-               'm',0,'l',0,'bwHz',bwCam,'zeta',0.8,'alpha',1.0,'vmax',0.8*wNL);
+               'm',0,'l',0,'bwHz',bwCam,'zeta',0.8,'alpha',1.0,'vmax',0.20/r);
+%  vmax: carriage at most 0.20 m/s (tuned on the rig: faster made the face tracking overshoot)
 ax(2) = struct('name','Illum A (pan)','type','servo','r',0,'JL',2e-6,'bL',0,'Tc',0, ...
                'm',0,'l',0,'bwHz',NaN,'zeta',NaN,'alpha',NaN,'vmax',3);
 ax(3) = struct('name','Illum B (pan)','type','servo','r',0,'JL',2e-6,'bL',0,'Tc',0, ...
@@ -183,7 +189,7 @@ P.cam.W     = 1280;
 P.cam.H     = 720;
 P.cam.fps   = 120;
 P.cam.zEye  = 0.60;                 % fallback eye distance if both eyes are not seen [m]
-P.cam.latency = 0.020;              % exposure + MJPG + USB + decode [s]    [PLACEHOLDER - measure]
+P.cam.latency = 0.10;               % exposure + MJPG + USB + decode [s] (tuned on the rig: no more sway at 0.10 s)
 %  (run_rig serial: the carriage position at t - latency is used for each frame)
 P.cam.sigmaPx = 0.5;                % pupil-centre noise [px]               [PLACEHOLDER]
 P.cam.zRelErr = 0.05;               % distance estimate error (from eye spacing) [-]
@@ -191,10 +197,11 @@ P.cam.blinks  = [1.5 4.6];          % blink start times in the scenario [s] (150
 %  Frame source for camera_open: 'webcam' (real OV9281), 'video' (recorded file),
 %  'images' (folder of PNG/JPG), 'synthetic' (rendered eyes, no hardware)
 P.cam.source     = 'webcam';
-P.cam.deviceName = '';              % part of the webcam name; '' = first camera found [CHECK webcamlist]
+P.cam.deviceName = 'openaicam';     % part of the webcam name (webcamlist shows the OV9281 as 'openaicam'); '' = first camera
 P.cam.videoFile  = '';              % for 'video'
 P.cam.imageDir   = '';              % for 'images'
-P.cam.every      = 3;               % in run_rig: grab a frame every N control periods (~33 Hz)
+P.cam.every      = 2;               % in run_rig: grab a frame every N control periods (25 Hz at Ts = 20 ms)
+P.cam.exposure   = -6;              % manual exposure, log2 of seconds (-6 = 16 ms); [] = auto
 P.cam.flipX      = false;           % mirror the image if the camera is mounted upside down
 P.cam.flipY      = false;
 
@@ -233,10 +240,10 @@ P.trk.vHeadMax    = 0.5;     % max head speed, widens the gate while an eye is u
 %  'eyes': pupil pair (needs the IR LEDs: dark pupil + glints)
 %  'face': face box (Viola-Jones, Computer Vision Toolbox) -> works in room light
 %          without LEDs; the pupil detector then only searches inside the face.
-P.trk.source = 'eyes';
+P.trk.source = 'face';      % as used now (IR LEDs not mounted yet); 'eyes' once they are
 P.face.width      = 0.15;    % real width of the detected face box [m]  [CHECK: z shown vs. tape measure]
 P.face.eyeLevel   = 0.40;    % eye height inside the box, from the top (fraction of box height)
-P.face.scale      = 0.5;     % detect on a downscaled frame (speed): 1/2, 1/3, ... (every k-th pixel)
+P.face.scale      = 1/3;     % detect on a downscaled frame (speed): 1/2, 1/3, ... (every k-th pixel)
 P.face.minSizePx  = 80;      % smallest face [px, full resolution] (~1 m away)
 P.face.zAlpha     = 0.3;     % low-pass on the distance from the face width
 P.face.detectFcn  = [];      % tests only: replacement detector @(img) boxes
@@ -247,15 +254,15 @@ P.head.zAlpha     = 0.2;     % low-pass on the distance from the eye spacing
 
 %% Eye-tracking software options (to recover performance with the wide lens)
 P.trk.useFilter = true;     % Kalman filter on the eye position (+ velocity)
-P.trk.useVelFF  = true;     % carriage velocity feed-forward from the filter
+P.trk.useVelFF  = false;    % carriage velocity feed-forward from the filter (off: face box too noisy)
 P.trk.qAcc      = 0.5;      % filter process noise: head acceleration PSD [(m/s^2)^2/Hz] (tuned)
 P.trk.bSP       = 1.0;      % no set-point weighting while tracking (b<1 adds lag on ramps)
 P.trk.jumpGate  = 4;        % innovation > jumpGate*sigma + jumpMin = jump, no velocity update
 P.trk.jumpMin   = 0.001;    % [m]
 P.trk.vffTau    = 0.15;     % low-pass on the velocity feed-forward [s] (saccades, noise)
-P.trk.deadband  = 0;        % carriage reference only changes if the head moved more than this [m]
-P.trk.maxErr    = 0.06;     % |reference - carriage| above this for 1 s (at once in rig_move_to) = runaway -> STOP [m]
-P.trk.holdBand  = 0;        % track_camera: motor off while the target is still and |error| < this [m]
+P.trk.deadband  = 0.01;     % carriage reference only changes if the head moved more than this [m]
+P.trk.maxErr    = 0.15;     % |reference - carriage| above this for 1 s (at once in rig_move_to) = runaway -> STOP [m]
+P.trk.holdBand  = 0.003;    % track_camera: motor off while the target is still and |error| < this [m]
 
 %% Head / eye motion scenario
 P.traj.Tend  = 6;
