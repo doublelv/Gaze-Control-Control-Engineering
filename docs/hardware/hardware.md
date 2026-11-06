@@ -1,5 +1,27 @@
 # Hardware
 
+## As built (2026-11-06)
+Differences from the order list and wiring plan below, and the state of the rig:
+| Item | As built |
+|---|---|
+| Motor driver | **Cytron MD10C** (single channel) instead of the MDD10A, on the same Nucleo pins (PWM PB8, DIR PB9) |
+| Endstop | **not fitted**. `PB12` (END_MIN) is wired to GND; homing stalls the carriage against both mechanical stops (`P.home.method = 'stall'`, `P.home.bothEnds = true`) |
+| Encoder | yellow and white wires swapped, so that moving to the user's **left = MAX = positive** count; MIN is on the right. Encoder VCC from the Nucleo **3V3**. The Dupont wires come loose easily; a loose encoder wire made the carriage run away, hence the pre-check before homing |
+| Motor | on the **left (MAX)** end of the rail |
+| 12 V supply | Mean Well LRS-150-12 **without a switch**: switch off by unplugging. Mains terminals still to be covered (requirement S6) |
+| Start-up order | Nucleo USB first, then the 12 V supply, then `run_rig` |
+| Servo 2 | PC7, on the **left** leg, wired. `P.srv.dir(2) = -1`; `P.srv.zeroUs(2) = 1830` estimated, aim not yet confirmed |
+| Servo 1 | PC6, right leg, **not wired yet** |
+| IR LEDs | **not mounted yet** (neither on the servos nor next to the camera) |
+| Camera | OV9281, MATLAB device name `'openaicam'`, exposure set to -6 |
+| COM port | COM3 on the team laptop (`config/local/params_local.m`) |
+
+Measured geometry (in `params.m`): carriage travel 650 mm stop to stop; servo LEDs 26 cm above the
+table, lens 36.5 cm; each servo LED 8 cm outside the lens when the carriage is at that end and
+0.5 cm in front; camera LEDs 1.5 cm left/right of the lens and 1 cm in front.
+Still unmeasured: carriage mass (`P.belt.mCar`, 0.3 kg is an estimate), motor inductance, camera latency.
+
+
 ## Bill of materials (ordered)
 | Part | Use | Key data |
 |---|---|---|
@@ -40,7 +62,7 @@ Notes:
 - "IR LED i" in software (ledMask bit i-1, `P.led` column i) = J10 "IR LED i", which drives schematic LED D(5-i).
   `P.led.servo` must name the LEDs that are physically on servo 1 and servo 2.
 - Servo power (J1-1, J3-1) comes from the buck 5 V; motor power is the 12 V supply. Only GND is shared with the Nucleo.
-- The endstop is not in the schematic yet: add it (3 wires).
+- The endstop is not fitted; PB12 is tied to GND instead (see "As built").
 - Unused CN7 pins: PB15, PB13 (Ethernet), VREFP, PA15, PA6, PB5 (twice), PB4.
 
 ## Power budget
