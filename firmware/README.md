@@ -4,6 +4,11 @@ Target: ST NUCLEO-H753ZI, C99. The firmware is an **I/O bridge** (decision 0001)
 MATLAB's commands (motor duty, 2 servo pulses, 4 LEDs), reports the encoder and the endstop,
 and enforces the safety rules by itself. Protocol: `interface/protocol.md` (v1).
 
+**As built** (`docs/hardware/hardware.md`): the motor driver is a Cytron **MD10C** (single
+channel, same PWM + DIR inputs) instead of the MDD10A named below, on the same pins. No endstop is
+fitted: `PB12` (END_MIN) is tied to GND (= not pressed, `ENDSTOP_ACTIVE_HIGH` 1) and MATLAB homes by
+stalling against the mechanical stops. Servo 1 (PC6) and the IR LEDs are not connected yet.
+
 ## Layout
 
 | Path | Content |
@@ -87,9 +92,11 @@ Clock: SYSCLK 480 MHz (PLL from HSI, voltage scale 0), APB1/APB2 timer clocks 24
    It must print `Link OK ... protocol v1, firmware 1.0` and 0 link errors.
 2. Turn the motor shaft one turn by hand: count changes by ~700 (x1) or ~2800 (x4). If x4, set `P.mot.cpr` accordingly.
 3. Press the endstop by hand: `endMin` must change. If inverted, flip `ENDSTOP_ACTIVE_HIGH` in `config.h`.
+   (Skipped on the rig: no endstop, PB12 tied to GND.)
 4. Motor connected, **belt off**: `io_check` pulses +2 V for 0.3 s; the carriage side of the pulley must turn toward MAX.
-   If not, flip `MOTOR_DIR_POSITIVE_HIGH`.
-5. Belt on: `TASK='sysid'`, copy the printed `mot.Jm` into `params_local.m`, then `TASK='track_synthetic'`.
+   If not, flip `MOTOR_DIR_POSITIVE_HIGH`. (On the rig the encoder wires were swapped instead, so that
+   the user's left = MAX = positive count.)
+5. Belt on: `TASK='sysid'`, copy the printed `mot.Jm` into `params.m` (done: 1.08e-6), then `TASK='track_synthetic'`.
 
 ## Safety behaviour (firmware, independent of MATLAB)
 - Start-up: motor 0, LEDs off, servos 1500 us.

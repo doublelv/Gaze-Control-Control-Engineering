@@ -8,7 +8,9 @@ Both are tested against `test-vectors/protocol_v1.txt`.
 - **MATLAB (PC)** owns all control: camera, eye/head tracking, carriage PID, servo angles, LEDs.
 - **STM32 (NUCLEO-H753ZI)** is an I/O bridge: applies the last command, reads encoder and
   endstop, enforces the safety rules below.
-- MATLAB sends one request every 10 ms (100 Hz) and waits for exactly one reply.
+- MATLAB sends one request per control period (`P.Ts` = 20 ms target; on the rig median 46 ms
+  with face detection) and waits for exactly one reply. A period longer than 100 ms trips the
+  firmware watchdog (motor 0 until the next CMD); `run_rig` prints the number of trips.
 
 ## Transport and lifecycle
 - ST-LINK virtual COM port, **921600 baud, 8N1**, no flow control, read timeout 50 ms (MATLAB).
@@ -33,7 +35,7 @@ checksum = (type + len + sum(payload)) mod 256
 | `0x81` STATE | MCU->PC | `int32 count` (encoder, output 700 CPR x1/x4 [CHECK]), `u8 flags`, `u8 seq` (echo), `u32 t_us`, `u16 rxErrors` | - |
 | `0x82` HELLO_REPLY | MCU->PC | `u8 proto` (=1), `u8 fwMajor`, `u8 fwMinor`, `u8 seq`, `u32 t_us` | - |
 
-STATE flags: bit0 MIN endstop pressed, bit1 MAX endstop pressed, bit2 watchdog tripped since the
+STATE flags (endstop bits stay 0 on the rig: no endstop, PB12 tied to GND): bit0 MIN endstop pressed, bit1 MAX endstop pressed, bit2 watchdog tripped since the
 previous STATE, bit3 duty forced to 0 by an endstop, bit4 malformed frame since the previous STATE.
 
 ## Validation and errors
