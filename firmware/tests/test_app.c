@@ -53,7 +53,7 @@ void test_app(void)
     /* clamping */
     send_cmd(-30000, 100, 9000, 0xFF, 8);
     CHECK(FB.motor_compare == MOTOR_PWM_COUNTS && FB.motor_positive == (MOTOR_DIR_POSITIVE_HIGH == 0), "duty clamp/dir");
-    CHECK(FB.servo_us[0] == SERVO_MIN_US && FB.servo_us[1] == SERVO_MAX_US && FB.led_mask == 0x0F, "servo/LED clamp");
+    CHECK(FB.servo_us[0] == SERVO_MIN_US && FB.servo_us[1] == SERVO_MAX_US && FB.led_mask == 0x3F, "servo/LED clamp");
     last_state(&s);
 
     /* endstop MIN pressed: negative duty blocked, positive allowed, flags reported */

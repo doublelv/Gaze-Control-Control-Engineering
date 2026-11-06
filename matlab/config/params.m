@@ -152,6 +152,7 @@ P.led.on   = [1 1 1 1];  % which LEDs to switch on (calibration, demo and tracki
 %  U-frame (fixed to the frame); LED 3, 4 fixed next to the camera on the carriage.
 P.led.servo   = [1 2 0 0];               % LED i is panned by servo k (0 = no servo, points +z)
 P.led.onFrame = [true true false false]; % true: fixed to the frame, false: rides on the carriage
+P.led.twin    = [5 6 0 0];               % second LED on servo 1 / 2: Nucleo LED_5 (PB15), LED_6 (PA6), firmware with LED_5/LED_6
 P.led.aim     = 'pan';                   % servo axis: 'pan' (vertical axis, as built) | 'tilt'
 %  P.led.pos [m], one column per LED, rows x/y/z:
 %   carriage LED: offset from the camera lens (x along the rail, y up, z toward the user)

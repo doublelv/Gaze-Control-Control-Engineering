@@ -14,7 +14,7 @@
 #define SERVO_MIN_US          500u
 #define SERVO_MAX_US          2500u
 #define SERVO_DEFAULT_US      1500u
-#define NUM_LEDS              4u
+#define NUM_LEDS              6u   /* LED_5 = PB15 (D17), LED_6 = PA6 (D12), set up in bsp_start */
 
 /* Safety: motor 0 and LEDs off when no valid CMD for this long */
 #define WATCHDOG_MS           100u

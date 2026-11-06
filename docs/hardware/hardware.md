@@ -12,7 +12,7 @@ Differences from the order list and wiring plan below, and the state of the rig:
 | Start-up order | Nucleo USB first, then the 12 V supply, then `run_rig` |
 | Servo 2 | PC7, on the **left** leg, wired. `P.srv.dir(2) = -1`; `P.srv.zeroUs(2) = 1830` estimated, aim not yet confirmed |
 | Servo 1 | PC6, right leg, **not wired yet** |
-| IR LEDs | mounted 2026-11-06: one on each servo (LED 1 right, LED 2 left) and two next to the camera (LED 3, 4); channel order still to check with `io_check` |
+| IR LEDs | mounted 2026-11-06: two on each servo and two next to the camera. Servo 1: LED_1 (PF3) + LED_5 (PB15, CN7 pin 3); servo 2: LED_2 (PD15) + LED_6 (PA6, CN7 pin 12); camera: LED_3 (PD14), LED_4 (PA4). LED_5/6 switch together with LED_1/2 (`P.led.twin`) |
 | Camera | OV9281, MATLAB device name `'openaicam'`, exposure set to -6 |
 | COM port | COM3 on the team laptop (`config/local/params_local.m`) |
 

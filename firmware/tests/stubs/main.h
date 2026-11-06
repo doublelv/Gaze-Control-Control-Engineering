@@ -28,6 +28,17 @@ extern uint32_t SystemCoreClock;
 #define END_MIN_Pin 0
 #define END_MAX_GPIO_Port 0
 #define END_MAX_Pin 0
+typedef struct { uint32_t Pin, Mode, Pull, Speed, Alternate; } GPIO_InitTypeDef;
+#define GPIOA 0
+#define GPIOB 0
+#define GPIO_PIN_6  0x0040u
+#define GPIO_PIN_15 0x8000u
+#define GPIO_MODE_OUTPUT_PP 1u
+#define GPIO_NOPULL 0u
+#define GPIO_SPEED_FREQ_LOW 0u
+#define __HAL_RCC_GPIOA_CLK_ENABLE() ((void)0)
+#define __HAL_RCC_GPIOB_CLK_ENABLE() ((void)0)
+void HAL_GPIO_Init(int port, GPIO_InitTypeDef *init);
 void HAL_GPIO_WritePin(int port, int pin, GPIO_PinState s);
 GPIO_PinState HAL_GPIO_ReadPin(int port, int pin);
 int HAL_TIM_Encoder_Start(TIM_HandleTypeDef *h, uint32_t c);
