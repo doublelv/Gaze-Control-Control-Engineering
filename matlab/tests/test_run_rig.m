@@ -41,6 +41,17 @@ assert(nnz(ok) > 50, 'face mode: too few head estimates');
 hx = arrayfun(@(tt) S.at(tt).head(1), r.L.t(ok));
 off = (hx - r.L.y(ok)*r.M.r)*1e3;
 assert(sqrt(mean(off.^2)) < 70, 'face mode: camera-to-head offset RMS %.1f mm', sqrt(mean(off.^2)));
+% P.trk.source = 'both' (params.m default): eyes inside the face box, face as fallback
+setenv('RIG_FACE_STUB', 'face_stub_synthetic'); setenv('RIG_SOURCE', 'both');
+r = run_task('track_camera', 5);
+setenv('RIG_FACE_STUB', '');
+ok = ~isnan(r.L.head(1,:)) & r.L.t > 2;
+assert(nnz(ok) > 50, 'both: too few head estimates');
+assert(any(r.L.srcCode == 2), 'both: the eyes were never followed');
+hx = arrayfun(@(tt) S.at(tt).head(1), r.L.t(ok));
+off = (hx - r.L.y(ok)*r.M.r)*1e3;
+assert(sqrt(mean(off.^2)) < 70, 'both: camera-to-head offset RMS %.1f mm', sqrt(mean(off.^2)));
+fprintf('both: followed eyes %d, face %d, none %d frames\n', nnz(r.L.srcCode == 2), nnz(r.L.srcCode == 1), nnz(r.L.srcCode == 0));
 end
 
 function r = run_task(task, trun)
