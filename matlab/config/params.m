@@ -117,7 +117,11 @@ ax = struct('name',{}, 'type',{}, 'r',{}, 'JL',{}, 'bL',{}, 'Tc',{}, 'm',{}, 'l'
             'bwHz',{}, 'zeta',{}, 'alpha',{}, 'vmax',{});
 ax(1) = struct('name','Camera X (linear)','type','dc','r',r, ...
                'JL',P.belt.mCar*r^2,'bL',0,'Tc',mot.T0 + P.belt.Fc*r, ...
-               'm',0,'l',0,'bwHz',bwCam,'zeta',0.8,'alpha',1.0,'vmax',0.20/r);
+               'm',0,'l',0,'bwHz',bwCam,'zeta',1.5,'alpha',1.0,'vmax',0.20/r);
+%  zeta 1.5: at 1 Hz the design gives Kd < 0 -> PI only; the higher zeta raises Kp
+%  (1.48 -> 2.28 V/rad). With set-point weight b = 0.6 (P.trk.bSP) a 50 mm step then
+%  has < 3 % overshoot and ~1 s settling (5 %) for loops of 20-56 ms in the model
+%  (make_paper_figures, compare_log_sim); zeta 0.8 / b = 1 gave ~30 % overshoot.
 %  vmax: carriage at most 0.20 m/s (tuned on the rig: faster made the face tracking overshoot)
 ax(2) = struct('name','Illum A (pan)','type','servo','r',0,'JL',2e-6,'bL',0,'Tc',0, ...
                'm',0,'l',0,'bwHz',NaN,'zeta',NaN,'alpha',NaN,'vmax',3);
@@ -256,7 +260,7 @@ P.head.zAlpha     = 0.2;     % low-pass on the distance from the eye spacing
 P.trk.useFilter = true;     % Kalman filter on the eye position (+ velocity)
 P.trk.useVelFF  = false;    % carriage velocity feed-forward from the filter (off: face box too noisy)
 P.trk.qAcc      = 0.5;      % filter process noise: head acceleration PSD [(m/s^2)^2/Hz] (tuned)
-P.trk.bSP       = 1.0;      % no set-point weighting while tracking (b<1 adds lag on ramps)
+P.trk.bSP       = 0.6;      % set-point weight in run_rig tracking + step test (1 = none: ~30 % overshoot)
 P.trk.jumpGate  = 4;        % innovation > jumpGate*sigma + jumpMin = jump, no velocity update
 P.trk.jumpMin   = 0.001;    % [m]
 P.trk.vffTau    = 0.15;     % low-pass on the velocity feed-forward [s] (saccades, noise)
@@ -271,6 +275,10 @@ P.traj.Ax    = 0.08; P.traj.fx = 0.3;
 P.traj.Ay    = 0.03; P.traj.fy = 0.2;
 P.traj.Az    = 0.05; P.traj.fz = 0.15;
 P.traj.tJump = 3.0;  P.traj.jump = [0.05; -0.02; 0];
+
+%% run_rig TASK = 'step' (real rig): carriage square wave around the rail centre
+P.stepTest.size   = 0.05;   % [m]
+P.stepTest.period = 3;      % each level held this long [s]
 
 %% Step test: axis 1 in metres of carriage travel, axes 2-3 in degrees
 P.step.size   = [0.05, 10*pi/180, 10*pi/180];   % converted to output angle in main

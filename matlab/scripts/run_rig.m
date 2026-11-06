@@ -9,6 +9,9 @@
 %   TASK = 'sysid'           homing, then a 3 V open-loop step -> rotor inertia for
 %                            params_local.m (run once after building the rig)
 %   TASK = 'track_synthetic' homing, then follow a simulated moving head (no camera)
+%   TASK = 'step'            homing, then carriage steps of P.stepTest.size around the
+%                            rail centre (square wave, P.stepTest.period) -> step-response
+%                            log for the sim-to-real comparison (no camera)
 %   TASK = 'track_camera'    homing, then follow the user's head with the camera,
 %                            aim the servo LEDs at the eyes, show the gaze point
 %
@@ -174,6 +177,8 @@ useCam = strcmp(TASK, 'track_camera');
 if strcmp(TASK, 'track_synthetic')
     Rref = coordinator_setpoints(P, t);          % simulated head path
 end
+P.bSP = P.trk.bSP;                               % set-point weight of the tracking controller
+useHold = useCam || strcmp(TASK, 'step');        % hold band: motor off near a still target
 if useCam
     if realtime, P.cam.source = 'webcam'; else, P.cam.source = 'synthetic'; end
     cam = camera_open(P);
@@ -181,7 +186,6 @@ if useCam
     T = eye_tracker_init(P);
     kf = [];
     gcal = gaze_calib_file(P, 'load');
-    P.bSP = P.trk.bSP;                           % no set-point weighting while tracking
     tLastFrame = NaN; Gs = [];
     useFace = strcmp(P.trk.source, 'face');      % follow the face box (no LEDs needed)
     fd = []; fbox = []; zFace = NaN; hFace = [];
@@ -194,10 +198,10 @@ if SHOW && useCam, V = viz_live_init(P, sprintf('run_rig %s (%s)', TASK, MODE));
 cmd.duty = 0; [io, fb] = rig_exchange(io, cmd); if fb.ok, y = yOf(fb); end   % fresh position (after the centring move)
 st = struct('I', C.Kp*(1 - P.bSP)*y, 'D', 0, 'yPrev', y);
 refPrev = y; tiltCmd = [0 0];
-refNow = [y; 0; 0]; vFF = 0; vFFraw = 0;
+refNow = [y; 0; 0]; vFF = 0; vFFraw = 0; yStep0 = y;
 L = struct('task', TASK, 'mode', MODE, 't', t, 'ref', nan(3, n), 'y', nan(1, n), 'V', nan(1, n), ...
            'loopMs', nan(1, n), 'ok', false(1, n), 'head', nan(3, n), 'statusCode', nan(1, n), ...
-           'gaze', nan(2, n), 'frameMs', nan(1, n), 'nOverrun', 0, 'nGuard', 0);
+           'gaze', nan(2, n), 'frameMs', nan(1, n), 'nOverrun', 0, 'nGuard', 0, 'tReal', nan(1, n));
 codes = {'search', 'track', 'blink', 'lost'};
 fprintf('Running %s for %.0f s (%s). Close the window or Ctrl-C to stop.\n', TASK, TRUN, MODE);
 tk.t0 = tic; tPrevLoop = 0; tBigErr = 0;
@@ -213,6 +217,10 @@ for k = 1:n
     switch TASK
         case 'track_synthetic'
             refNow = Rref(:, k); vFF = 0;
+        case 'step'                              % square wave: centre, +size, centre, ...
+            up = mod(floor(tNow/P.stepTest.period), 2) == 1;
+            refNow = [yStep0 + up*P.stepTest.size/M.r; 0; 0]; vFF = 0;
+            if tNow > TRUN, break, end           % real time (n is only an upper bound)
         case 'track_camera'
             if mod(k - 1, P.cam.every) == 0
                 tf0 = toc(tk.t0);
@@ -288,7 +296,7 @@ for k = 1:n
     refSteady = abs(ref(1) - refPrev) < 1e-9;
     refPrev = ref(1);
     Vff = M.Ke*vFF + M.R*M.Tc/M.Kt*tanh(vFF/0.05);
-    if useCam && refSteady && abs(ref(1) - y)*M.r < P.trk.holdBand
+    if useHold && refSteady && abs(ref(1) - y)*M.r < P.trk.holdBand
         Vm = 0; st.yPrev = y; st.D = 0;          % close enough and target still: motor off, no hunting
     else
         [Vm, st] = pid_step(st, C, M, P, ref(1), y, Vff, dt);
@@ -311,7 +319,7 @@ for k = 1:n
     cmd.servoUs = [toUs(ref(2), 1), toUs(ref(3), 2)];
     cmd.led = logical(P.led.on);
 
-    L.ref(:, k) = ref; L.y(k) = y; L.V(k) = Vm; L.ok(k) = fb.ok;
+    L.ref(:, k) = ref; L.y(k) = y; L.V(k) = Vm; L.ok(k) = fb.ok; L.tReal(k) = tNow;
     L.loopMs(k) = (toc(tk.t0) - tNow)*1e3*realtime;
     if ~rig_tick_wait(tk, k), L.nOverrun = L.nOverrun + 1; end
 end
