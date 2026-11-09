@@ -10,8 +10,8 @@ Differences from the order list and wiring plan below, and the state of the rig:
 | Motor | on the **left (MAX)** end of the rail |
 | 12 V supply | Mean Well LRS-150-12 **without a switch**: switch off by unplugging. Mains terminals still to be covered (requirement S6) |
 | Start-up order | Nucleo USB first, then the 12 V supply, then `run_rig` |
-| Servo 2 | PC7, on the **left** leg, wired. `P.srv.dir(2) = -1`; `P.srv.zeroUs(2) = 1830` estimated, aim not yet confirmed |
-| Servo 1 | PC6, right leg, **not wired yet** |
+| Servo 1 | PC6, on the user's **left** leg (MAX end, motor side). servo_test 2026-11-09: `zeroUs(1) = 1600`, `dir(1) = +1` |
+| Servo 2 | PC7, on the user's **right** leg (MIN end). servo_test 2026-11-09: `zeroUs(2) = 1930`, `dir(2) = -1` (LED bracket re-mounted so the LEDs face the user inside the 500-2500 us range) |
 | IR LEDs | mounted 2026-11-06: two on each servo and two next to the camera. Servo 1: LED_1 (PF3) + LED_5 (PB15, CN7 pin 3); servo 2: LED_2 (PD15) + LED_6 (PA6, CN7 pin 12); camera: LED_3 (PD14), LED_4 (PA4). LED_5/6 switch together with LED_1/2 (`P.led.twin`) |
 | Camera | OV9281, MATLAB device name `'openaicam'`, exposure set to -6 |
 | COM port | COM3 on the team laptop (`config/local/params_local.m`) |

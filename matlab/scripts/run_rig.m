@@ -40,6 +40,7 @@ if ~isempty(getenv('RIG_FACE_STUB'))             % tests: face mode with a stand
     if strcmp(P.trk.source, 'eyes'), P.trk.source = 'face'; end
     P.face.detectFcn = str2func(getenv('RIG_FACE_STUB'));
 end
+if ~isempty(getenv('RIG_DET_METHOD')), P.det.method = getenv('RIG_DET_METHOD'); end   % tests: 'pupil' | 'face'
 assert(strcmp(P.loopMode, 'matlab'), 'set P.loopMode = ''matlab'' in params.m');
 M = build_axis_model(P.ax(1), P);
 C = design_pid(M, P.ax(1), P.Ts);
@@ -246,7 +247,11 @@ for k = 1:n
                         [fbox, fd] = face_find(fd, img, P, fbox);
                         imgE = face_mask(img, fbox);
                     end
-                    det = eye_detect(imgE, P, eye_tracker_prior(T, tFrame, P));
+                    if useFace && strcmp(P.det.method, 'face')
+                        det = eye_in_face(img, fbox, P);   % iris inside the face box
+                    else
+                        det = eye_detect(imgE, P, eye_tracker_prior(T, tFrame, P));
+                    end
                     [T, obs] = eye_tracker_update(T, det, tFrame, P);
                     [H, T] = head_estimate(obs, T, xCam, P);
                     eyesTrk = ~any(strcmp(obs.status, {'search', 'lost'}));
