@@ -3,7 +3,7 @@ function test_run_rig()
 %   Nucleo + motor + camera): io_check, homing + synthetic tracking, homing +
 %   camera tracking. Checks link errors, tracking error and that the camera
 %   follows the virtual user's head.
-envs = {'RIG_MODE', 'RIG_TASK', 'RIG_TRUN', 'RIG_SHOW', 'RIG_FACE_STUB', 'RIG_SOURCE'};
+envs = {'RIG_MODE', 'RIG_TASK', 'RIG_TRUN', 'RIG_SHOW', 'RIG_FACE_STUB', 'RIG_SOURCE', 'RIG_DET_METHOD'};
 c = onCleanup(@() cellfun(@(e) setenv(e, ''), envs));
 setenv('RIG_MODE', 'virtual'); setenv('RIG_SHOW', '0');
 setenv('RIG_SOURCE', 'eyes');            % synthetic eyes (params.m default is 'face')
@@ -42,9 +42,11 @@ hx = arrayfun(@(tt) S.at(tt).head(1), r.L.t(ok));
 off = (hx - r.L.y(ok)*r.M.r)*1e3;
 assert(sqrt(mean(off.^2)) < 70, 'face mode: camera-to-head offset RMS %.1f mm', sqrt(mean(off.^2)));
 % P.trk.source = 'both' (params.m default): eyes inside the face box, face as fallback
-setenv('RIG_FACE_STUB', 'face_stub_synthetic'); setenv('RIG_SOURCE', 'both');
+% (the synthetic face is a bright blob without a real eye band -> pupil detector;
+%  eye_in_face is tested in test_eye_in_face)
+setenv('RIG_FACE_STUB', 'face_stub_synthetic'); setenv('RIG_SOURCE', 'both'); setenv('RIG_DET_METHOD', 'pupil');
 r = run_task('track_camera', 5);
-setenv('RIG_FACE_STUB', '');
+setenv('RIG_FACE_STUB', ''); setenv('RIG_DET_METHOD', '');
 ok = ~isnan(r.L.head(1,:)) & r.L.t > 2;
 assert(nnz(ok) > 50, 'both: too few head estimates');
 assert(any(r.L.srcCode == 2), 'both: the eyes were never followed');

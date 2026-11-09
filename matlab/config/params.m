@@ -100,10 +100,10 @@ srv.framePer = 20e-3;              % 50 Hz
 srv.Kin      = 40;                 % internal loop gain [1/s]     [PLACEHOLDER]
 srv.tauW     = 0.015;              % speed lag [s]                [PLACEHOLDER]
 srv.usRes    = 1;                  % STM32 timer gives <=1 us easily
-srv.zeroUs   = [1500 1830];        % pulse [us] at which each LED points straight ahead (+z, at the user)
-                                   %   servo 1 (PC6): not wired yet [CALIBRATE]; servo 2 (PC7): 1830 estimated [CHECK aim]
+srv.zeroUs   = [1600 1930];        % pulse [us] at which each LED points straight ahead (+z, at the user)
+                                   %   measured with servo_test 2026-11-09 (servo 1 = PC6, servo 2 = PC7)
 srv.dir      = [1 -1];             % +1 if a longer pulse turns the LED toward +x (MAX side), else -1
-                                   %   servo 1 [CALIBRATE]; servo 2 measured -1
+                                   %   measured with servo_test 2026-11-09
 P.srv = srv;
 
 %% Axes
@@ -165,7 +165,9 @@ P.led.aim     = 'pan';                   % servo axis: 'pan' (vertical axis, as 
 %  Measured: servo LEDs 26 cm above the table, lens 36.5 cm; each servo LED is
 %  8 cm outside the lens when the carriage is at that end; 0.5 cm in front.
 %  Camera LEDs 1.5 cm left/right of the lens, 1 cm in front.
-P.led.pos = [-0.080  P.belt.travel+0.080  -0.015  0.015;
+%  Servo 1 (PC6, LED 1) is on the user's LEFT leg = MAX end (motor side), servo 2
+%  (PC7, LED 2) on the RIGHT leg = MIN end (servo_test 2026-11-09).
+P.led.pos = [P.belt.travel+0.080  -0.080  -0.015  0.015;
              -0.105  -0.105                 0.000  0.000;
               0.005   0.005                 0.010  0.010];
 
@@ -236,6 +238,19 @@ P.det.glintRadK   = 2.2;     % glints searched within max(3 px, glintRadK * pupi
 P.det.maxGlints   = 4;
 P.det.maxGlintArea= 12;      % [px] larger bright areas are sclera/skin, not glints
 P.det.whichEye    = 'right'; % eye used when only one is wanted (image right)
+%  Which eye finder run_rig track_camera uses with P.trk.source = 'both':
+%   'face'  : eye_in_face.m, the iris (darkest round spot) in each half of the eye
+%             band of the face box. On the rig at ~50 cm the iris is ~10 px wide and
+%             the pupil is not darker than the iris, so the pupil detector misses
+%             most frames (2026-11-09 recording: eyes 29-39 %; with 'face': 97 %).
+%   'pupil' : eye_detect.m (dark pupil + glints, needs a close, sharp eye image)
+P.det.method          = 'face';
+P.det.faceBand        = [-0.12 0.10]; % eye band rows: P.face.eyeLevel + this (fraction of box height)
+P.det.faceCols        = [0.15 0.85];  % columns searched (fraction of box width), split in the middle
+P.det.faceIris        = 0.025;        % iris radius / face box width (~5 px at 200 px box)
+P.det.faceEncl        = 2.2;          % skin must be brighter this many iris radii above and below
+P.det.faceMinContrast = 0.47;         % (skin - iris)/skin; below = closed eye. Recording: open >= 0.49, closed <= 0.45
+P.det.faceSep         = [0.20 0.55];  % eye spacing / box width accepted as a pair
 
 %% Eye tracker (eye_detection/eye_tracker.m)
 P.trk.blinkMax    = 0.40;    % both eyes missing shorter than this = blink [s]
