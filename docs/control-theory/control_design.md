@@ -28,7 +28,14 @@ First design (before the rig ran): $T_s = 10$ ms, $\omega_n = 2\pi \cdot 2$ Hz, 
 On the rig the loop period is much longer (median 46 ms with face detection), and the margin
 at 2 Hz drops to 27 deg at 20 ms and -3 deg at 46 ms (`loop_margins`, delay 1.5 $T$).
 So the design now uses $T_s = 20$ ms (target) and $\omega_n = 2\pi \cdot 1$ Hz.
-At 1 Hz the formula gives $K_d < 0$, so $K_d = 0$ (PI only) and the poles differ from the target.
+At 1 Hz the formula gives $K_d < 0$ (the back-EMF already damps enough), so pole placement alone
+would give a PI. The loop on the rig, however, has a delay of 1.5 loop periods (median 46 ms with the
+camera, peaks above 100 ms) that costs phase. `design_pid` therefore sets $K_d$ by a second rule:
+the smallest $K_d$ (filtered D on the measurement, $T_f$ = 40 ms) that gives a phase margin of
+50 deg at 46 ms (`P.ax(1).pmTarget`, `TsPM`). Result: $K_p$ 2.28 V/rad, $K_i$ 3.58 V/(rad s),
+$K_d$ 0.062 V s/rad. Phase margin PI -> PID: 54 -> 62 deg at 20 ms, 42 -> 50 deg at 46 ms,
+9 -> 17 deg at 118 ms (model, `compare_p_pi_pid`). Model step (b = 0.6): 2.6 % overshoot,
+0.78-0.86 s settling (5 %). `plot_pid_terms` shows the three terms in a run_rig log.
 
 | | $\zeta$ | $K_p$ [V/rad] | $K_i$ | crossover | PM / GM at $T$ = 20 ms | PM / GM at $T$ = 46 ms |
 |---|---|---|---|---|---|---|

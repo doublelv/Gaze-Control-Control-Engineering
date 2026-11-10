@@ -19,7 +19,8 @@ P.loopMode   = 'matlab';
 if strcmp(P.loopMode, 'matlab')
     % Measured on the rig: loop median ~46 ms (camera + face detection), so
     % 20 ms is the target and 1 Hz the bandwidth that stays calm at that rate.
-    % (At 1 Hz design_pid warns "Kd < 0": the motor's own damping is enough.)
+    % (At 1 Hz pole placement gives Kd < 0; design_pid then sets Kd from a
+    %  phase-margin rule, see P.ax(1).pmTarget.)
     P.Ts = 20e-3;  bwCam = 1;
 else
     P.Ts = 1e-3;   bwCam = 6;
@@ -115,10 +116,11 @@ P.srv = srv;
 %  vmax : reference slew limit [rad/s at the output shaft]
 r = P.belt.r;
 ax = struct('name',{}, 'type',{}, 'r',{}, 'JL',{}, 'bL',{}, 'Tc',{}, 'm',{}, 'l',{}, ...
-            'bwHz',{}, 'zeta',{}, 'alpha',{}, 'vmax',{});
+            'bwHz',{}, 'zeta',{}, 'alpha',{}, 'vmax',{}, 'pmTarget',{}, 'TsPM',{});
 ax(1) = struct('name','Camera X (linear)','type','dc','r',r, ...
                'JL',P.belt.mCar*r^2,'bL',0,'Tc',mot.T0 + P.belt.Fc*r, ...
-               'm',0,'l',0,'bwHz',bwCam,'zeta',1.5,'alpha',1.0,'vmax',0.20/r);
+               'm',0,'l',0,'bwHz',bwCam,'zeta',1.5,'alpha',1.0,'vmax',0.20/r, ...
+               'pmTarget',50,'TsPM',0.046);
 %  zeta 1.5: at 1 Hz the design gives Kd < 0 -> PI only; the higher zeta raises Kp
 %  (1.48 -> 2.28 V/rad). With set-point weight b = 0.6 (P.trk.bSP) a 50 mm step then
 %  has < 3 % overshoot and ~1 s settling (5 %) for loops of 20-56 ms in the model
@@ -126,10 +128,14 @@ ax(1) = struct('name','Camera X (linear)','type','dc','r',r, ...
 %  2026-11-09, 20 ms loop, camera off): 0 % overshoot in 9 of 9 steps.
 %  The first rig runs used zeta 0.8 / b = 1 (model: ~40 % overshoot).
 %  vmax: carriage at most 0.20 m/s (value set on the rig)
+%  pmTarget/TsPM: D gain from the phase-margin rule in design_pid: Kd is raised until
+%  the phase margin at the measured median loop period (46 ms, camera on) is 50 deg
+%  (PI only: 42 deg). The D term (on the measurement, filtered) adds phase lead that
+%  makes up for part of the loop delay -> full PID. Model: 2.6 % overshoot, 0.86 s (5 %).
 ax(2) = struct('name','Illum A (pan)','type','servo','r',0,'JL',2e-6,'bL',0,'Tc',0, ...
-               'm',0,'l',0,'bwHz',NaN,'zeta',NaN,'alpha',NaN,'vmax',3);
+               'm',0,'l',0,'bwHz',NaN,'zeta',NaN,'alpha',NaN,'vmax',3,'pmTarget',NaN,'TsPM',NaN);
 ax(3) = struct('name','Illum B (pan)','type','servo','r',0,'JL',2e-6,'bL',0,'Tc',0, ...
-               'm',0,'l',0,'bwHz',NaN,'zeta',NaN,'alpha',NaN,'vmax',3);
+               'm',0,'l',0,'bwHz',NaN,'zeta',NaN,'alpha',NaN,'vmax',3,'pmTarget',NaN,'TsPM',NaN);
 %  servo load: 5 mm IR LED + small holder, ~10 g; vertical servo axis (pan) -> no gravity torque
 P.ax = ax;
 P.useGravFF = true;

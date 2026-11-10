@@ -52,11 +52,11 @@ fprintf('PID (V/rad): Kp %.3f  Ki %.3f  Kd %.4f\n', C.Kp, C.Ki, C.Kd);
 fprintf('  Ts %2.0f ms: PM %.1f deg, GM %.1f dB, wc %.2f Hz\n', P.Ts*1e3, mgD.PM, mgD.GM, mgD.wc/2/pi);
 fprintf('  Ts %2.0f ms: PM %.1f deg, GM %.1f dB, wc %.2f Hz\n', TloopMeas*1e3, mgR.PM, mgR.GM, mgR.wc/2/pi);
 % the same comparison for the original 2 Hz design and the first 1 Hz design (zeta 0.8)
-ax0 = P.ax(1); ax0.zeta = 0.8; C0 = design_pid(M, ax0, P.Ts);
+ax0 = P.ax(1); ax0.zeta = 0.8; ax0.pmTarget = NaN; C0 = design_pid(M, ax0, P.Ts);   % first rig design (PI)
 mg0D = loop_margins(M, C0, P.Ts); mg0R = loop_margins(M, C0, TloopMeas);
 D.pid0 = struct('Kp', C0.Kp, 'Ki', C0.Ki, 'Kd', C0.Kd, 'design', mg0D, 'measured', mg0R);
 fprintf('  (1 Hz, zeta 0.8: Kp %.2f, PM %.1f deg at %2.0f ms, %.1f deg at %2.0f ms)\n', C0.Kp, mg0D.PM, P.Ts*1e3, mg0R.PM, TloopMeas*1e3);
-ax2 = P.ax(1); ax2.bwHz = 2; ax2.zeta = 0.8; C2 = design_pid(M, ax2, P.Ts);
+ax2 = P.ax(1); ax2.bwHz = 2; ax2.zeta = 0.8; ax2.pmTarget = NaN; C2 = design_pid(M, ax2, P.Ts);   % pole placement only
 mg2D = loop_margins(M, C2, P.Ts); mg2R = loop_margins(M, C2, TloopMeas);
 D.pid2 = struct('Kp', C2.Kp, 'Ki', C2.Ki, 'Kd', C2.Kd, 'design', mg2D, 'measured', mg2R);
 fprintf('  (2 Hz design: PM %.1f deg at %2.0f ms, %.1f deg at %2.0f ms)\n', mg2D.PM, P.Ts*1e3, mg2R.PM, TloopMeas*1e3);

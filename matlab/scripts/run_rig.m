@@ -221,7 +221,7 @@ refNow = [y; 0; 0]; vFF = 0; vFFraw = 0; yStep0 = y;
 L = struct('task', TASK, 'mode', MODE, 't', t, 'ref', nan(3, n), 'y', nan(1, n), 'V', nan(1, n), ...
            'loopMs', nan(1, n), 'ok', false(1, n), 'head', nan(3, n), 'statusCode', nan(1, n), ...
            'gaze', nan(2, n), 'frameMs', nan(1, n), 'srcCode', nan(1, n), 'nOverrun', 0, 'nGuard', 0, 'tReal', nan(1, n), ...
-           'gazeDeg', nan(1, n), 'glints', nan(1, n), 'hold', false(1, n));
+           'gazeDeg', nan(1, n), 'glints', nan(1, n), 'hold', false(1, n), 'uPID', nan(3, n));
 codes = {'search', 'track', 'blink', 'lost'};
 fprintf('Running %s for %.0f s (%s). Close the window or Ctrl-C to stop.\n', TASK, TRUN, MODE);
 tk.t0 = tic; tPrevLoop = 0; tBigErr = 0;
@@ -350,6 +350,7 @@ for k = 1:n
         Vm = 0; st.yPrev = y; st.D = 0;          % at the target and target still: motor off, no hunting
     else
         [Vm, st] = pid_step(st, C, M, P, ref(1), y, Vff, dt);
+        L.uPID(:, k) = [st.uP; st.uI; st.uD];    % P, I, D terms [V] (plot_pid_terms)
     end
     if ~fb.ok, Vm = 0; end                                       % no fresh encoder value: coast
     % runaway check: the carriage cannot follow its (slew-limited) reference
@@ -385,6 +386,7 @@ d = fullfile(root, 'artifacts', 'logs'); if ~exist(d, 'dir'), mkdir(d); end
 logFile = fullfile(d, sprintf('rig_%s_%s.mat', TASK, datestr(now, 'yyyymmdd_HHMMSS')));
 save(logFile, 'L', 'P', 'C');
 fprintf('Log: %s\n', logFile);
+fprintf('PID: Kp %.2f V/rad, Ki %.2f V/(rad s), Kd %.3f V s/rad (plot: plot_pid_terms(''%s''))\n', C.Kp, C.Ki, C.Kd, logFile);
 e = (L.ref(1,:) - L.y)*M.r*1e3;
 fprintf('Carriage tracking error: RMS %.2f mm, max %.2f mm\n', sqrt(mean(e(~isnan(e)).^2)), max(abs(e)));
 if useCam
