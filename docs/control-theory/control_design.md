@@ -49,8 +49,15 @@ measured $dt$ (clipped to 0.5-3 $T_s$), optional velocity feed-forward
 $V_{ff} = K_e\,\hat\omega_{ref} + R\,\tau_c/K_t\,\tanh(\hat\omega_{ref}/0.05)$ (off on the rig: `P.trk.useVelFF = false`).
 
 Settings used on the rig (`params.m`, `run_rig`): reference dead band 10 mm (`P.trk.deadband`),
-slew limit 0.20 m/s, hold band 3 mm (`P.trk.holdBand`: motor off while the target is still and
-the error is below 3 mm).
+slew limit 0.20 m/s, hold band with hysteresis (`hold_band.m`): the motor is switched off once the
+target is still and the error is below 0.3 mm (`P.trk.holdBand`), and on again above 1 mm
+(`P.trk.holdExit`). Until 2026-11-09 the band was 3 mm without hysteresis; the motor then stopped
+0.7-2.6 mm short of a 50 mm step, because the integrator does not act while the motor is off.
+
+Gaze follow (`gaze_follow.m`, `P.gzf`, track_camera): after a 2 s zeroing (user looks at the
+camera) the iris offset inside the face box gives a horizontal gaze angle
+$\theta = \arcsin(d/r_{eye})$ and the carriage reference becomes $x_{head} + z\tan\theta$
+(dead zone, low-pass and blink hold in `params.m`). Approximate: no per-user calibration.
 
 ## 3. Reference generation (MIMO coordinator, `refs_from_eye.m`)
 One head estimate drives three axes:

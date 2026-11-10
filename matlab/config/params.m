@@ -5,9 +5,9 @@ function P = params()
 %
 %   Axis order everywhere in this project:
 %     1 = Camera X  : LINEAR carriage on 2020 V-slot, V-wheels, GT2 belt,
-%                     FIT0186 geared DC motor + encoder, MDD10A driver
-%     2 = Illum A   : pan, SER0006 micro servo on the MIN-side leg of the frame
-%     3 = Illum B   : pan, SER0006 micro servo on the MAX-side leg of the frame
+%                     FIT0186 geared DC motor + encoder, MD10C driver
+%     2 = Illum A   : pan, servo 1 (PC6) on the MAX-side (user's LEFT) leg of the frame
+%     3 = Illum B   : pan, servo 2 (PC7) on the MIN-side (user's RIGHT) leg of the frame
 %     (the servos are fixed to the U-frame, NOT on the carriage; see P.led)
 %   Controller board: NUCLEO-H753ZI (STM32H753, Cortex-M7)
 
@@ -30,13 +30,13 @@ P.g          = 9.81;
 
 %% Power + driver
 %  PSU   : Mean Well LRS-150-12 -> 12 V, 12.5 A
-%  Driver: Cytron MDD10A, 2 ch, 10 A/ch, 5-30 V, sign-magnitude PWM+DIR,
-%          3.3 V logic OK (MD10C also ordered: single channel, spare)
+%  Driver: Cytron MD10C (as built), 1 ch, 13 A continuous, 5-30 V, sign-magnitude
+%          PWM+DIR, 3.3 V logic OK   [CHECK 13 A / 5-30 V with the team]
 P.psu.V    = 12;
 P.psu.Imax = 12.5;
 P.drv.fPWM = 20e3;            % [Hz]
 P.drv.pwmCounts = 12000;      % STM32 timer: 240 MHz / 20 kHz      [CHECK clock config]
-P.drv.Imax = 10;              % MDD10A continuous per channel [A]
+P.drv.Imax = 10;              % [A] conservative limit for the stall-current check (MD10C datasheet: 13 A [CHECK])
 
 %% FIT0186 geared DC motor (DFRobot wiki):
 %  12 V, 43.8:1, no-load 251 rpm @ 350 mA, stall 18 kg*cm @ 7 A,
@@ -90,7 +90,7 @@ P.endstops   = [false false];  % [MIN MAX] wired? must match USE_END_MIN / USE_E
 
 %% SER0006 micro servo (DFRobot / Farnell): 4.8-6 V, 0.156 Nm @6 V
 %  (1.3 kg*cm used = conservative @4.8 V), 0.12 s/60 deg @4.8 V, dead band 7 us.
-%  !! needs its own 5-6 V supply (not 12 V, not MDD10A)
+%  !! needs its own 5-6 V supply (not 12 V, not the motor driver)
 srv.tauStall = 1.3*9.81/100;
 srv.wmax     = (60*pi/180)/0.12;
 srv.deadUs   = 7;
@@ -122,8 +122,9 @@ ax(1) = struct('name','Camera X (linear)','type','dc','r',r, ...
 %  zeta 1.5: at 1 Hz the design gives Kd < 0 -> PI only; the higher zeta raises Kp
 %  (1.48 -> 2.28 V/rad). With set-point weight b = 0.6 (P.trk.bSP) a 50 mm step then
 %  has < 3 % overshoot and ~1 s settling (5 %) for loops of 20-56 ms in the model
-%  (make_paper_figures, compare_log_sim). Model only, not yet run on the rig;
-%  the rig ran zeta 0.8 / b = 1, for which the model predicts ~40 % overshoot.
+%  (make_paper_figures, compare_log_sim). On the rig (run_rig TASK = 'step',
+%  2026-11-09, 20 ms loop, camera off): 0 % overshoot in 9 of 9 steps.
+%  The first rig runs used zeta 0.8 / b = 1 (model: ~40 % overshoot).
 %  vmax: carriage at most 0.20 m/s (value set on the rig)
 ax(2) = struct('name','Illum A (pan)','type','servo','r',0,'JL',2e-6,'bL',0,'Tc',0, ...
                'm',0,'l',0,'bwHz',NaN,'zeta',NaN,'alpha',NaN,'vmax',3);
@@ -139,9 +140,11 @@ P.bSP       = 0.6;     % set-point weight on P-term
 P.led.halfAngleDeg = 17.5;
 P.led.If  = 0.050; P.led.VfTyp = 1.5; P.led.VfMax = 2.2;  % VfTyp [CHECK]
 P.led.Rser = 68;  P.led.Prated = 0.25;                     % Yageo MFR-25 68R
-P.led.n    = 4;    % schematic: 4 IR LEDs, each 68R + NPN switch (470R base, 10k pull-down)
+P.led.n    = 4;    % LED channels 1-4 in the schematic (each 68R + NPN switch, 470R base, 10k pull-down)
 %   LED i = J10 'IR LED i' = Nucleo LED_i (PF3, PD15, PD14, PA4) = schematic D(5-i)
 %   (J10 'IR LED 1' drives D4 ... 'IR LED 4' drives D1). See docs/hardware/hardware.md.
+%   As built there are 6 LEDs: LED_5 (PB15) and LED_6 (PA6) were added later as the
+%   second LED on servo 1 / 2 (P.led.twin) and switch together with LED 1 / 2.
 P.led.on   = [1 1 1 1];  % which LEDs to switch on (calibration, demo and tracking)
 %  NOTE: the gaze feature uses the centroid of ALL glints. The frame LEDs (1, 2)
 %  do not move with the camera, so their glints shift when the head moves
@@ -251,6 +254,8 @@ P.det.faceIris        = 0.025;        % iris radius / face box width (~5 px at 2
 P.det.faceEncl        = 2.2;          % skin must be brighter this many iris radii above and below
 P.det.faceMinContrast = 0.47;         % (skin - iris)/skin; below = closed eye. Recording: open >= 0.49, closed <= 0.45
 P.det.faceSep         = [0.20 0.55];  % eye spacing / box width accepted as a pair
+P.det.faceGlintR      = 1.5;          % glint search disc around the iris centre (iris radii)
+P.det.faceGlintK      = 0.5;          % glint: brighter than skin + this*(255 - skin) and >= P.det.glintMin
 
 %% Eye tracker (eye_detection/eye_tracker.m)
 P.trk.blinkMax    = 0.40;    % both eyes missing shorter than this = blink [s]
@@ -286,7 +291,23 @@ P.trk.jumpMin   = 0.001;    % [m]
 P.trk.vffTau    = 0.15;     % low-pass on the velocity feed-forward [s] (saccades, noise)
 P.trk.deadband  = 0.01;     % carriage reference only changes if the head moved more than this [m]
 P.trk.maxErr    = 0.15;     % |reference - carriage| above this for 1 s (at once in rig_move_to) = runaway -> STOP [m]
-P.trk.holdBand  = 0.003;    % track_camera: motor off while the target is still and |error| < this [m]
+P.trk.holdBand  = 0.0003;   % motor off once the target is still and |error| < this [m] (hold_band.m)
+                            %   was 3 mm until 2026-11-09: the motor then stopped 0.7-2.6 mm short
+                            %   (no integral action inside the band); 0.3 mm = ~11 encoder counts
+P.trk.holdExit  = 0.001;    % ... and on again when |error| > this [m] (hysteresis: no hunting)
+
+%% Gaze follow (gaze_estimation/gaze_follow.m, run_rig track_camera)
+%  The carriage goes to the point on the rail the eyes look at: x = x_head + z*tan(theta).
+%  theta from the iris position inside the face box (no per-user calibration).
+P.gzf.on        = true;     % false: follow the head only (as before 2026-11-10)
+P.gzf.tZero     = 2.0;      % zeroing at the start: look straight at the camera this long [s]
+P.gzf.minSamples= 10;       % frames with both eyes needed for the zeroing
+P.gzf.rEye      = 0.011;    % eyeball centre to iris centre [m] (eye models: ~10-11 mm)  [CHECK on the rig]
+P.gzf.deadDeg   = 6;        % angles below this count as 0 [deg]: 1 px of iris or face-box jitter
+                            %   is ~5 deg at 50 cm, and the face box is found on a 1/3 frame  [tune on the rig]
+P.gzf.maxDeg    = 35;       % limit [deg]
+P.gzf.tau       = 0.4;      % low-pass on the angle [s] (jitter)
+P.gzf.holdT     = 0.6;      % keep the last angle this long when the eyes are lost (blink) [s]
 
 %% Head / eye motion scenario
 P.traj.Tend  = 6;

@@ -5,7 +5,8 @@ function det = eye_in_face(img, box, P)
 %   dark iris, so a pupil detector finds nothing; the iris (the darkest round
 %   spot in each eye region) is still clear.
 %   img : H x W uint8 frame,  box : [x y w h] from face_find ([] -> no eyes)
-%   det : same fields as eye_detect (eyes(1) = image right), no glints.
+%   det : same fields as eye_detect (eyes(1) = image right); glints: the brightest
+%         small spot on the iris, if any (IR LED reflection, logged only).
 %   Steps per eye: region (left/right half of the eye band of the box) ->
 %   smoothing with an iris-sized window (thin lash lines and eyebrow hairs fade,
 %   the iris stays dark) -> darkest point with skin above and below -> mean shift
@@ -62,12 +63,25 @@ for s = 1:2
         u = mean(X(w)); v = mean(Y(w));
     end
     if ~ok, continue, end
-    u = u - 0.5 + (c1 - 1); v = v - 0.5 + (r1 - 1);   % full-image px, pixel centre = c - 0.5
     conf = min(1, contrast/(2*D.faceMinContrast));
-    det.cand(end+1, :) = [u v rIris conf contrast];   % (5th column: contrast, not area)
+    det.cand(end+1, :) = [u - 0.5 + (c1 - 1), v - 0.5 + (r1 - 1), rIris, conf, contrast];   % full-image px (5th column: contrast)
     if contrast < D.faceMinContrast, continue, end    % closed eye / no eye
+    % IR glint (corneal reflection of the LEDs): a small, very bright spot on the
+    % iris. Only reported (log: are the LEDs aimed at the eye?), not used for control.
+    gl = zeros(0, 2); gc = [NaN NaN];
+    ul = u; vl = v;                                  % (still region pixel coordinates here)
+    disc = hypot(X - ul, Y - vl) <= D.faceGlintR*rIris;
+    gMax = max(G(disc));
+    if ~isempty(gMax) && gMax >= D.glintMin && gMax >= ref + D.faceGlintK*(255 - ref)
+        bright = disc & G >= 0.9*gMax;
+        if nnz(bright) <= D.maxGlintArea
+            gc = [mean(X(bright)) mean(Y(bright))] - 0.5 + [c1 r1] - 1;
+            gl = gc;
+        end
+    end
+    u = u - 0.5 + (c1 - 1); v = v - 0.5 + (r1 - 1);   % full-image px, pixel centre = c - 0.5
     det.eyes(end+1) = struct('uv', [u v], 'r', rIris, 'conf', conf, ...
-                             'glints', zeros(0, 2), 'gc', [NaN NaN], 'pccr', [NaN NaN]);
+                             'glints', gl, 'gc', gc, 'pccr', [NaN NaN]);
 end
 det.nCand = size(det.cand, 1);
 if numel(det.eyes) == 2

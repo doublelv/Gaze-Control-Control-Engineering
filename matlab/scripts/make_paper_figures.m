@@ -149,7 +149,7 @@ function S = sim_camera_loop(P, M, C, head, Tloop, Tend, compensate)
 % the carriage position is taken NOW (no compensation) or at the frame time (compensated).
 Mt = model_at(P, Tloop); n = round(Tend/Tloop); t = (0:n-1)*Tloop;
 x = zeros(3,1); Vapp = 0; refPrev = 0; refNow = 0;
-st = struct('I', 0, 'D', 0, 'yPrev', 0);
+st = struct('I', 0, 'D', 0, 'yPrev', 0); holding = false;
 S = struct('t', t, 'x', zeros(1,n), 'ref', zeros(1,n), 'head', head(t));
 lat = P.cam.latency;
 for k = 1:n
@@ -165,7 +165,8 @@ for k = 1:n
     dmax = P.ax(1).vmax*Tloop; ref = refPrev + min(max(refNow - refPrev, -dmax), dmax);
     ref = min(max(ref, P.belt.xMin/M.r), P.belt.xMax/M.r);
     steady = abs(ref - refPrev) < 1e-9; refPrev = ref; S.ref(k) = ref*M.r;
-    if steady && abs(ref - y)*M.r < P.trk.holdBand
+    [hold, holding] = hold_band(holding, steady, abs(ref - y)*M.r, P);
+    if hold
         Vm = 0; st.yPrev = y; st.D = 0;
     else
         [Vm, st] = pid_step(st, C, M, P, ref, y, 0, Tloop);

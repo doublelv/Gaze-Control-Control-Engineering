@@ -22,6 +22,16 @@ for e = 1:2
     assert(err < 1.5, 'eye %d off by %.2f px', e, err);
 end
 
+assert(all(arrayfun(@(x) isempty(x.glints), d.eyes)), 'no LED reflection drawn, but a glint was found');
+
+% IR glint (LED reflection) on the image-right iris -> found there only
+imgG = img;
+imgG(abs(Y - ev + 1) < 1 & abs(X - eu(1) - 1) < 1) = 255;
+dG = eye_in_face(uint8(imgG), box, P);
+assert(numel(dG.eyes) == 2, 'glint: eyes lost');
+assert(size(dG.eyes(1).glints, 1) == 1 && isempty(dG.eyes(2).glints), 'glint: expected on eye 1 only');
+assert(hypot(dG.eyes(1).gc(1) - (eu(1) + 1), dG.eyes(1).gc(2) - (ev - 1)) < 1.5, 'glint position off');
+
 % closed eyes: only the thin lash lines are left -> no eyes
 img2 = 40*ones(H, W);
 img2(box(2):box(2)+box(4), box(1):box(1)+box(3)) = 170;
