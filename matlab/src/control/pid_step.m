@@ -5,13 +5,15 @@ function [V, st] = pid_step(st, C, M, P, ref, y, Vff, dt)
 %   Vff : optional feed-forward voltage [V] (velocity FF)
 %   dt  : optional measured sample time [s] (default P.Ts); clipped to [0.5, 3]*P.Ts
 %   V   : motor voltage command [V], saturated to the PSU voltage
+%   st.uP, st.uI, st.uD : the P, I and D terms of this sample [V]
 if nargin < 7 || isempty(Vff), Vff = 0; end
 if nargin < 8 || isempty(dt), dt = P.Ts; end
 Ts = min(max(dt, 0.5*P.Ts), 3*P.Ts);
 e  = ref - y;
 st.D = (C.Tf*st.D - C.Kd*(y - st.yPrev))/(C.Tf + Ts);   % filtered D on measurement
 st.yPrev = y;
-Vu = C.Kp*(P.bSP*ref - y) + st.I + st.D + Vff;          % set-point weighted P + FF
+st.uP = C.Kp*(P.bSP*ref - y); st.uI = st.I; st.uD = st.D;   % the three terms [V] (logged by run_rig)
+Vu = st.uP + st.uI + st.uD + Vff;                        % set-point weighted P + I + D + FF
 V  = min(max(Vu, -M.Vmax), M.Vmax);
 if Vu == V || sign(e) ~= sign(Vu)                       % conditional integration
     st.I = st.I + C.Ki*Ts*e;
