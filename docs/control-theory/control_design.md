@@ -61,10 +61,14 @@ target is still and the error is below 0.3 mm (`P.trk.holdBand`), and on again a
 (`P.trk.holdExit`). Until 2026-11-09 the band was 3 mm without hysteresis; the motor then stopped
 0.7-2.6 mm short of a 50 mm step, because the integrator does not act while the motor is off.
 
-Gaze follow (`gaze_follow.m`, `P.gzf`, track_camera): after a 2 s zeroing (user looks at the
-camera) the iris offset inside the face box gives a horizontal gaze angle
-$\theta = \arcsin(d/r_{eye})$ and the carriage reference becomes $x_{head} + z\tan\theta$
-(dead zone, low-pass and blink hold in `params.m`). Approximate: no per-user calibration.
+Gaze follow (`gaze_follow.m`, `P.gzf`, track_camera): the iris offset inside the face box gives
+an angle $m = \arcsin(d/r_{eye})$ relative to the camera. When the camera itself moves by the angle
+$\varphi = \arctan((x_{cam} - x_{head})/z)$ the eyes look turned by about $-B\varphi$ even if they
+do not move; the first version (2026-11-10) ignored this and the carriage chased its own motion
+(left-right oscillation, runaway stop on the rig). Now a ~10 s start-up calibration (user looks at
+one fixed point; zeroing, then the carriage moves to -60/+60/0 mm) fits $B$; tracking uses
+$\theta = m + 0.8\,B(\varphi - \varphi_0)$ and the reference $x_{head} + z\tan\theta$. A poor fit, or the
+angle swinging left-right 4 times in 4 s, switches gaze follow off (head following only).
 
 ## 3. Reference generation (MIMO coordinator, `refs_from_eye.m`)
 One head estimate drives three axes:

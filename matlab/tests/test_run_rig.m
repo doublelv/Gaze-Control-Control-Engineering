@@ -69,12 +69,13 @@ assert(sqrt(mean(off.^2)) < 70, 'both: camera-to-head offset RMS %.1f mm', sqrt(
 fprintf('both: followed eyes %d, face %d, none %d frames\n', nnz(r.L.srcCode == 2), nnz(r.L.srcCode == 1), nnz(r.L.srcCode == 0));
 % gaze follow on (params.m default): runs, zeroes, and stays inside the software limits
 setenv('RIG_FACE_STUB', 'face_stub_synthetic'); setenv('RIG_SOURCE', 'both'); setenv('RIG_DET_METHOD', 'pupil'); setenv('RIG_GZF', '1');
-r = run_task('track_camera', 5);
+r = run_task('track_camera', 16);                % ~10 s calibration, then gaze follow
 setenv('RIG_FACE_STUB', ''); setenv('RIG_DET_METHOD', ''); setenv('RIG_GZF', '0');
-assert(any(~isnan(r.L.gazeDeg)), 'gaze follow: never zeroed / no angle');
+assert(isfield(r, 'gz') && any(strcmp(r.gz.phase, {'run', 'off'})), 'gaze follow: calibration did not finish');
+assert(any(~isnan(r.L.gazeM)), 'gaze follow: no raw angles logged');
 x = r.L.y(~isnan(r.L.y))*r.M.r;
 assert(all(x > r.P.belt.xMin - 0.005 & x < r.P.belt.xMax + 0.005), 'gaze follow: carriage outside the limits');
-fprintf('gaze follow: angle %+.0f..%+.0f deg\n', min(r.L.gazeDeg), max(r.L.gazeDeg));
+fprintf('gaze follow: phase %s, B %.2f, R2 %.2f\n', r.gz.phase, r.gz.B, r.gz.R2);
 end
 
 function r = run_task(task, trun)
@@ -87,4 +88,5 @@ function r = run_isolated()
 run_rig;
 r = struct('io', io);
 if exist('L', 'var'), r.L = L; r.M = M; r.P = P; end
+if exist('gz', 'var') && ~isempty(gz), r.gz = gz; end
 end

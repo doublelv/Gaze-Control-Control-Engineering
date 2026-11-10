@@ -304,11 +304,23 @@ P.trk.holdExit  = 0.001;    % ... and on again when |error| > this [m] (hysteres
 
 %% Gaze follow (gaze_estimation/gaze_follow.m, run_rig track_camera)
 %  The carriage goes to the point on the rail the eyes look at: x = x_head + z*tan(theta).
-%  theta from the iris position inside the face box (no per-user calibration).
+%  theta from the iris position inside the face box. A ~10 s calibration at the start
+%  (user looks at one fixed point straight ahead) measures how much the camera's own
+%  motion changes the apparent eye angle (B) and removes it; without that the carriage
+%  chased its own motion (rig 2026-11-10: left-right oscillation, runaway stop).
 P.gzf.on        = true;     % false: follow the head only (as before 2026-11-10)
-P.gzf.tZero     = 2.0;      % zeroing at the start: look straight at the camera this long [s]
-P.gzf.minSamples= 10;       % frames with both eyes needed for the zeroing
-P.gzf.rEye      = 0.011;    % eyeball centre to iris centre [m] (eye models: ~10-11 mm)  [CHECK on the rig]
+P.gzf.tZero     = 2.0;      % zeroing: look straight ahead this long [s]
+P.gzf.minSamples= 10;       % frames needed for the zeroing / for the calibration fit
+P.gzf.calPts    = [-0.06 0.06 0];  % calibration: carriage positions from the rail centre [m]
+P.gzf.calDwell  = 2.5;      % time at each calibration position [s]
+P.gzf.calRec    = 1.0;      % ... samples taken in the last this-many seconds (carriage settled) [s]
+P.gzf.Brange    = [0.3 5];  % accepted B (step_camera log 2026-11-10: ~1.9, R = 0.57, gaze not controlled)
+P.gzf.minR2     = 0.4;      % accepted fit quality
+P.gzf.Bshrink   = 0.8;      % B used = this * fitted B (over-correcting = positive feedback, under = only less motion)
+P.gzf.oscDeg    = 10;       % oscillation guard: theta beyond +-this counts as one side [deg]
+P.gzf.oscFlips  = 4;        % ... this many side changes ...
+P.gzf.oscWin    = 4;        % ... within this time [s] -> gaze follow off
+P.gzf.rEye      = 0.011;    % eyeball centre to iris centre [m] (eye models: ~10-11 mm); smaller -> camera moves more
 P.gzf.deadDeg   = 6;        % angles below this count as 0 [deg]: 1 px of iris or face-box jitter
                             %   is ~5 deg at 50 cm, and the face box is found on a 1/3 frame  [tune on the rig]
 P.gzf.maxDeg    = 35;       % limit [deg]
