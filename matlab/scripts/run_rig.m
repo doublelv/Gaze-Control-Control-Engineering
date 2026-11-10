@@ -231,7 +231,11 @@ for k = 1:n
     tNow = toc(tk.t0);
     if ~realtime, tNow = t(k); end
     dt = tNow - tPrevLoop; tPrevLoop = tNow;
-    [io, fb] = rig_exchange(io, cmd);
+    try
+        [io, fb] = rig_exchange(io, cmd);
+    catch err                                    % e.g. encoder jump (Nucleo reset): stop, keep the log
+        stopMsg = err.message; break
+    end
     if fb.ok, y = yOf(fb); end
     xCar = y*M.r;
     if useCam, tHist(k) = tNow; xHist(k) = xCar; end
@@ -392,7 +396,7 @@ for k = 1:n
     L.loopMs(k) = (toc(tk.t0) - tNow)*1e3*realtime;
     if ~rig_tick_wait(tk, k), L.nOverrun = L.nOverrun + 1; end
 end
-cmd.duty = 0; cmd.led = ledsOff; rig_exchange(io, cmd);
+cmd.duty = 0; cmd.led = ledsOff; try, rig_exchange(io, cmd); catch, end   % (rig_close stops it too)
 
 %% ------------------------------------------------------------ report
 fprintf('Link errors: %d of %d, watchdog trips: %d, loop overruns: %d\n', io.nErr, n, io.nWdog, L.nOverrun);
@@ -404,7 +408,7 @@ d = fullfile(root, 'artifacts', 'logs'); if ~exist(d, 'dir'), mkdir(d); end
 logFile = fullfile(d, sprintf('rig_%s_%s.mat', TASK, datestr(now, 'yyyymmdd_HHMMSS')));
 save(logFile, 'L', 'P', 'C');
 fprintf('Log: %s\n', logFile);
-if ~isempty(stopMsg), error('run_rig:runaway', '%s (log saved)', stopMsg); end
+if ~isempty(stopMsg), error('run_rig:stopped', '%s (log saved)', stopMsg); end
 fprintf('PID: Kp %.2f V/rad, Ki %.2f V/(rad s), Kd %.3f V s/rad (plot: plot_pid_terms(''%s''))\n', C.Kp, C.Ki, C.Kd, logFile);
 e = (L.ref(1,:) - L.y)*M.r*1e3;
 fprintf('Carriage tracking error: RMS %.2f mm, max %.2f mm\n', sqrt(mean(e(~isnan(e)).^2)), max(abs(e)));
