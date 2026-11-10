@@ -1,73 +1,64 @@
 function test_gaze_follow()
-%TEST_GAZE_FOLLOW  gaze_follow.m on hand-made tracker outputs: zeroing, the
-%   calibration of the camera-motion effect B, compensation, sign and size of
-%   the angle, dead zone, blink hold, failed calibration and the off switch.
+%TEST_GAZE_FOLLOW  gaze_follow.m in a small closed loop: a synthetic eye whose
+%   apparent angle depends on the camera position (m = thw - B*phi, B = 1.9 as
+%   estimated on the rig, also B = 1 and 3), the carriage following the
+%   reference with a first-order lag and 0.1 s camera latency.
+%   Checks: zeroing, no motion when looking at the camera, motion toward the
+%   gaze side and back, stable for several B, oscillation guard, blink hold,
+%   off switch.
 P = params();
-P.gzf.tau = 1e-3;                                % no low-pass: check the raw model
-P.gzf.Bshrink = 1;                               % exact compensation (rig default 0.8)
-f = P.cam.f_px; z = 0.5; rE = P.gzf.rEye; Btrue = 1.9;
+f = P.cam.f_px; z = 0.45; rE = P.gzf.rEye;
 box = [400 200 200 200]; cx = box(1) - 0.5 + box(3)/2;
-u0 = cx + [35 -35];                              % iris columns when looking straight ahead
-% synthetic eye: world gaze thw [deg], camera at xc, head at 0
-%   apparent angle m = thw - Btrue*phi  ->  iris offset d = rE*sind(m) at the eye
-obsAt = @(thw, xc) struct('seen', [true true], ...
-    'uv', [u0 + rE*sind(thw - Btrue*atand(xc/z))*f/z; 300 300]);
+u0 = cx + [35 -35];                              % iris columns when looking at the camera
+eyes = @(thw, xc, B) struct('seen', [true true], ...
+    'uv', [u0 + rE*sind(thw - B*atand(xc/z))*f/z; 300 300]);
 H = struct('z', z, 'pos', [0; 0; z]);
-gz = []; t = 0; xc = 0; dt = 0.04; calRefs = [];
-% 1.+2. zeroing and calibration: the user looks straight ahead (thw = 0) and the
-%       carriage goes where gaze_follow asks (calRef)
-while t < 15 && (isempty(gz) || any(strcmp(gz.phase, {'wait', 'zero', 'cal'})))
-    t = t + dt;
-    [gz, d] = gaze_follow(gz, obsAt(0, xc), box, H, xc, t, true, P);
-    if ~isnan(gz.calRef), xc = gz.calRef; calRefs(end+1) = gz.calRef; end %#ok<AGROW>
-    assert(isnan(d), 'angle during the calibration');
-end
-assert(strcmp(gz.phase, 'run'), 'calibration did not finish (phase %s)', gz.phase);
-assert(any(calRefs < 0) && any(calRefs > 0), 'calibration did not move the carriage both ways');
-assert(abs(gz.Bfit - Btrue) < 0.1, 'B %.2f, expected %.2f', gz.Bfit, Btrue);
-% 3. eyes straight ahead, camera anywhere -> 0 (own motion removed)
-for xc = [-0.08 0 0.05]
-    t = t + dt; [gz, d] = gaze_follow(gz, obsAt(0, xc), box, H, xc, t, true, P);
-    assert(abs(d) < 0.5, 'camera at %.0f mm, eyes straight: %.2f deg', xc*1e3, d);
-end
-% world gaze 25 deg -> 25 - dead zone, at two camera positions
-for xc = [0 0.06]
-    t = t + dt; [gz, d] = gaze_follow(gz, obsAt(25, xc), box, H, xc, t, true, P);
-    assert(abs(d - (25 - P.gzf.deadDeg)) < 0.6, 'gaze 25 deg, camera %.0f mm: %.2f', xc*1e3, d);
-end
-t = t + dt; [gz, d] = gaze_follow(gz, obsAt(-25, 0), box, H, 0, t, true, P);
-assert(abs(d + (25 - P.gzf.deadDeg)) < 0.6, 'gaze -25 deg: %.2f', d);
-% small angle stays in the dead zone
-t = t + dt; [gz, d] = gaze_follow(gz, obsAt(3, 0), box, H, 0, t, true, P);
-assert(d == 0, 'small angle: %.2f deg', d);
-% 4. blink: last angle kept for P.gzf.holdT, then NaN (follow the head)
-t = t + dt; [gz, d0] = gaze_follow(gz, obsAt(25, 0), box, H, 0, t, true, P);
-none = struct('seen', [false false], 'uv', nan(2));
-[gz, d1] = gaze_follow(gz, none, box, H, 0, t + 0.2, false, P);
-assert(abs(d1 - d0) < 1e-9, 'blink: angle not held');
-[gz, d2] = gaze_follow(gz, none, box, H, 0, t + P.gzf.holdT + 0.1, false, P);
-assert(isnan(d2), 'eyes gone: expected NaN, got %.2f', d2);
-% oscillation guard: the angle swinging left-right fast -> off
-gz2 = gz; t2 = t;
-for j = 1:10
-    t2 = t2 + 0.3; gz2 = gaze_follow(gz2, obsAt(30*(-1)^j, 0), box, H, 0, t2, true, P);
-end
-assert(strcmp(gz2.phase, 'off'), 'oscillation guard did not switch off');
-% 5. calibration with random eye movements -> poor fit -> off (follow the head)
-rng(1); gz = []; t = 0; xc = 0;
-while t < 15 && (isempty(gz) || any(strcmp(gz.phase, {'wait', 'zero', 'cal'})))
-    t = t + dt;
-    thw = 0; if strcmp(gaze_phase(gz), 'cal'), thw = 30*randn; end
-    gz = gaze_follow(gz, obsAt(thw, xc), box, H, xc, t, true, P);
-    if ~isnan(gz.calRef), xc = gz.calRef; end
-end
-assert(strcmp(gz.phase, 'off'), 'noisy calibration: expected off, got %s', gz.phase);
-% 6. off switch
-P.gzf.on = false;
-[~, d] = gaze_follow([], obsAt(25, 0), box, H, 0, 0, true, P);
-assert(isnan(d), 'gaze follow off: expected NaN');
+
+for B = [1 1.9 3]
+    [x, gz] = loop(P, eyes, H, B, @(t) 0, 6);
+    assert(strcmp(gz.phase, 'run'), 'B %.1f: not running (%s)', B, gz.phase);
+    assert(abs(x(end)) < 0.005, 'B %.1f: looking at the camera, carriage moved to %.0f mm', B, x(end)*1e3);
+    % look 25 deg toward +x for 5 s, then -25 deg for 5 s
+    [x, gz, tt] = loop(P, eyes, H, B, @(t) 25*(t >= 4 & t < 9) - 25*(t >= 9), 14);
+    x1 = x(find(tt < 9, 1, 'last')); x2 = x(end);
+    xEq = z*tand((25 - P.gzf.deadDeg)/(B - P.gzf.Bcomp));   % where the eyes look at the camera again
+    assert(x1 > 0.6*xEq && x1 < 1.4*xEq + 0.01, 'B %.1f: +25 deg -> %.0f mm (expected ~%.0f)', B, x1*1e3, xEq*1e3);
+    assert(x2 < -0.6*xEq, 'B %.1f: -25 deg -> %.0f mm', B, x2*1e3);
+    assert(strcmp(gz.phase, 'run'), 'B %.1f: switched off (%s)', B, gz.phase);
+    s = sign(diff(x(tt > 4 & tt < 9))); s = s(s ~= 0);
+    assert(sum(diff(s) ~= 0) <= 2, 'B %.1f: carriage oscillates (%d reversals)', B, sum(diff(s) ~= 0));
+    fprintf('B %.1f: gaze +25 deg -> carriage %+.0f mm, -25 deg -> %+.0f mm\n', B, x1*1e3, x2*1e3);
 end
 
-function p = gaze_phase(gz)
-if isempty(gz), p = ''; else, p = gz.phase; end
+% oscillation guard: eyes flipping fast from side to side -> off
+P2 = P; P2.gzf.Ki = 20;
+[~, gz] = loop(P2, eyes, H, 1.9, @(t) 30*(t > 3)*sign(sin(2*pi*1.0*t)), 12);
+assert(strcmp(gz.phase, 'off'), 'oscillation guard did not switch off (%s)', gz.phase);
+
+% blink: psi held, then back to 0 after P.gzf.lostT
+[~, gz] = loop(P, eyes, H, 1.9, @(t) 25*(t >= 4), 7);
+p0 = gz.psi; none = struct('seen', [false false], 'uv', nan(2));
+gz = gaze_follow(gz, none, box, H, 0, 7.2, false, P);
+assert(abs(gz.psi - p0) < 1e-9, 'blink: psi not held');
+for t = 7.2:0.05:12, gz = gaze_follow(gz, none, box, H, 0, t, false, P); end
+assert(abs(gz.psi) < 1, 'eyes lost: psi did not return to 0 (%.1f)', gz.psi);
+
+% off
+P.gzf.on = false;
+[~, d] = gaze_follow([], eyes(25, 0, 1.9), box, H, 0, 0, true, P);
+assert(isnan(d), 'gaze follow off: expected NaN');
+
+    function [x, gz, tt] = loop(P, eyes, H, B, thw, T)
+        dt = 0.045; tt = 0:dt:T; n = numel(tt);
+        x = zeros(1, n); ref = 0; gz = [];
+        lat = round(0.1/dt);
+        for k = 2:n
+            xd = x(max(1, k - lat));                 % camera position when the frame was taken
+            [gz, d] = gaze_follow(gz, eyes(thw(tt(k)), xd, B), box, H, xd, tt(k), true, P);
+            if ~isnan(d), r_ = H.pos(1) + H.z*tand(d); else, r_ = H.pos(1); end
+            if abs(r_ - ref) >= P.trk.deadband, ref = r_; end
+            v = min(max((ref - x(k-1))*2*pi*1.0, -0.2), 0.2);   % 1 Hz carriage, 0.2 m/s
+            x(k) = x(k-1) + v*dt;
+        end
+    end
 end
