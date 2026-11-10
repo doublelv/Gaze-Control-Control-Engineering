@@ -23,6 +23,7 @@ function [gz, deg] = gaze_follow(gz, obs, box, H, xCam, t, eyesOk, P)
 %      direct "target = x_head + z*tan(m)" ran away on the rig for that reason).
 %      m + P.gzf.Bcomp*(phi - phi0) is used: part of the camera's own effect is
 %      removed so the camera travels further (keep Bcomp < 1: B >= 1 for an eye).
+%   |m| > P.gzf.mMax is a wrong iris detection and is ignored.
 %   psi is limited to the rail (no wind-up), held during blinks, and returns to 0
 %   when the eyes are lost longer than P.gzf.lostT. Safety: P.gzf.oscFlips side
 %   changes of psi within P.gzf.oscWin s -> off (head following only).
@@ -45,8 +46,8 @@ if valid
 end
 if ~any(isnan(gz.rel0)) && valid
     d = rel - gz.rel0; d = mean(d(~isnan(d)));
-    s = min(max(d*box(3)*H.z/P.cam.f_px/G.rEye, -1), 1);
-    gz.m = asind(s);
+    s = d*box(3)*H.z/P.cam.f_px/G.rEye;
+    if abs(s) < sind(G.mMax), gz.m = asind(s); end   % larger = wrong iris (eye can't turn that far)
 end
 
 switch gz.phase

@@ -226,6 +226,7 @@ L = struct('task', TASK, 'mode', MODE, 't', t, 'ref', nan(3, n), 'y', nan(1, n),
            'gazeM', nan(1, n), 'gazePhi', nan(1, n));
 codes = {'search', 'track', 'blink', 'lost'};
 fprintf('Running %s for %.0f s (%s). Close the window or Ctrl-C to stop.\n', TASK, TRUN, MODE);
+Mlim = M; if useCam, Mlim.Vmax = min(M.Vmax, P.trk.Vlim); end   % voltage limit with the camera (pid_step saturates + anti-wind-up)
 tk.t0 = tic; tPrevLoop = 0; tBigErr = 0; stopMsg = ''; aimF = [NaN NaN]; aimS = [NaN NaN];
 for k = 1:n
     tNow = toc(tk.t0);
@@ -363,7 +364,7 @@ for k = 1:n
     if useHold && hold
         Vm = 0; st.yPrev = y; st.D = 0;          % at the target and target still: motor off, no hunting
     else
-        [Vm, st] = pid_step(st, C, M, P, ref(1), y, Vff, dt);
+        [Vm, st] = pid_step(st, C, Mlim, P, ref(1), y, Vff, dt);
         L.uPID(:, k) = [st.uP; st.uI; st.uD];    % P, I, D terms [V] (plot_pid_terms)
     end
     if ~fb.ok, Vm = 0; end                                       % no fresh encoder value: coast
