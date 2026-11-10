@@ -237,6 +237,7 @@ for k = 1:n
     catch err                                    % e.g. encoder jump (Nucleo reset): stop, keep the log
         stopMsg = err.message; break
     end
+    tTx = toc(tk.t0);                            % last command sent (rig_keep_alive)
     if fb.ok, y = yOf(fb); end
     xCar = y*M.r;
     if useCam, tHist(k) = tNow; xHist(k) = xCar; end
@@ -254,6 +255,7 @@ for k = 1:n
             tf0 = toc(tk.t0);
             ctx = struct('t', tNow, 'xCar', xCar, 'led', logical(P.led.on), 'tilt', tiltCmd);
             [cam, img, inf_] = camera_read(cam, P, ctx);
+            [io, tTx, stopMsg] = rig_keep_alive(io, cmd, tk, tTx, realtime, P); if ~isempty(stopMsg), break, end
             if inf_.ok
                 tFrame = tNow; if realtime, tFrame = toc(tk.t0); end
                 % carriage position WHEN THE FRAME WAS TAKEN (not now): otherwise the
@@ -274,6 +276,7 @@ for k = 1:n
                 else
                     det = eye_detect(imgE, P, eye_tracker_prior(T, tFrame, P));
                 end
+                [io, tTx, stopMsg] = rig_keep_alive(io, cmd, tk, tTx, realtime, P); if ~isempty(stopMsg), break, end
                 [T, obs] = eye_tracker_update(T, det, tFrame, P);
                 [H, T] = head_estimate(obs, T, xCam, P);
                 eyesTrk = ~any(strcmp(obs.status, {'search', 'lost'}));
@@ -328,6 +331,7 @@ for k = 1:n
                 end
                 L.head(:, k) = H.pos; L.statusCode(k) = find(strcmp(codes, obs.status)) - 1;
                 L.frameMs(k) = (toc(tk.t0) - tf0)*1e3;
+                [io, tTx, stopMsg] = rig_keep_alive(io, cmd, tk, tTx, realtime, P); if ~isempty(stopMsg), break, end
                 gzLabel = ''; if ~isempty(gz), gzLabel = gz.label; end
                 if SHOW
                     if ~viz_alive(V.fig), break, end

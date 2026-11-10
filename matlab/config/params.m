@@ -195,6 +195,7 @@ P.geo.cam2   = [0.10; 0; 0];                      % hypothetical 2nd camera, ste
 P.link.port = "COM5";      % Windows: check Device Manager; macOS/Linux: "/dev/tty.usbmodem..." [CHECK]
 P.link.baud = 921600;      % [CHECK] must match the firmware
 P.link.watchdog = 0.1;     % firmware stops the motor if no command for 100 ms
+P.link.keepAlive = 0.04;   % run_rig: re-send the last command after this long inside a camera loop [s]
 P.link.timeout  = 0.05;    % serial read timeout [s]
 P.link.maxCountRate = 1.5*wNL/(2*pi)*2800;   % encoder plausibility: counts/s above this = jump (Nucleo reset?) -> STOP
 
