@@ -11,7 +11,9 @@ All files here are SIM (tests only). `run_all_tests` (MATLAB or Octave, from thi
 | `test_tracker` | camera -> tracker -> head on the moving synthetic scene (lock, blinks, x/z/roll errors) |
 | `test_gaze` | headless synthetic calibration, leave-one-out and new-target errors, save/load |
 | `test_pid_design` | phase / gain margins |
-| `test_run_rig` | the `run_rig` script in virtual mode: io_check, track_synthetic, step (overshoot < 5 %, settling < 1.5 s), track_camera (eyes and face) |
+| `test_eye_in_face` | iris finder in a drawn face box (lash line, hair, closed eyes), IR glint on one iris |
+| `test_gaze_follow` | gaze angle from the iris offset: zeroing, sign/size, head shift, dead zone, blink hold |
+| `test_run_rig` | the `run_rig` script in virtual mode: io_check, track_synthetic, step (overshoot < 5 %, settling < 1.5 s, steady-state error <= 1 mm, no hold-band hunting), step_camera, track_camera (eyes, face, both, gaze follow) |
 
 Fixtures are synthetic (rendered faces, generated vectors); no personal recordings.
 Tests ignore `config/local/params_local.m`. Hardware results are reported separately.

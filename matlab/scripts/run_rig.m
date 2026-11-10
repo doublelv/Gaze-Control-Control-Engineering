@@ -12,10 +12,16 @@
 %   TASK = 'step'            homing, then carriage steps of P.stepTest.size around the
 %                            rail centre (square wave, P.stepTest.period) -> step-response
 %                            log for the sim-to-real comparison (no camera)
+%   TASK = 'step_camera'     the same steps, but the camera, face and eye detection
+%                            run as in track_camera (they only load the loop, the
+%                            carriage follows the square wave) -> step response with
+%                            the real loop time
 %   TASK = 'track_camera'    homing, then follow the user's head with the camera
 %                            (P.trk.source: 'both' = eyes inside the face, else the
 %                            face), aim the servo LEDs at the eyes, all LEDs in
-%                            P.led.on switched on, gaze point if calibrated
+%                            P.led.on switched on, gaze point if calibrated;
+%                            P.gzf.on: the carriage goes where the eyes look
+%                            (look straight at the camera for P.gzf.tZero s first)
 %
 %   Stop: close the live window or Ctrl-C. On exit the motor is stopped and the
 %   LEDs switched off (onCleanup -> STOP frame); the firmware watchdog also stops
@@ -41,6 +47,7 @@ if ~isempty(getenv('RIG_FACE_STUB'))             % tests: face mode with a stand
     P.face.detectFcn = str2func(getenv('RIG_FACE_STUB'));
 end
 if ~isempty(getenv('RIG_DET_METHOD')), P.det.method = getenv('RIG_DET_METHOD'); end   % tests: 'pupil' | 'face'
+if ~isempty(getenv('RIG_GZF')), P.gzf.on = strcmp(getenv('RIG_GZF'), '1'); end   % tests: gaze follow off/on
 assert(strcmp(P.loopMode, 'matlab'), 'set P.loopMode = ''matlab'' in params.m');
 M = build_axis_model(P.ax(1), P);
 C = design_pid(M, P.ax(1), P.Ts);
@@ -177,12 +184,14 @@ end
 %% ------------------------------------------------------------ tracking
 n = round(TRUN/P.Ts);
 t = (0:n-1)*P.Ts;
-useCam = strcmp(TASK, 'track_camera');
+useCam = any(strcmp(TASK, {'track_camera', 'step_camera'}));
+followCam = strcmp(TASK, 'track_camera');       % step_camera: camera only loads the loop
 if strcmp(TASK, 'track_synthetic')
     Rref = coordinator_setpoints(P, t);          % simulated head path
 end
 P.bSP = P.trk.bSP;                               % set-point weight of the tracking controller
 useHold = useCam || strcmp(TASK, 'step');        % hold band: motor off near a still target
+holding = false;                                 % hold_band state (hysteresis)
 if useCam
     if realtime, P.cam.source = 'webcam'; else, P.cam.source = 'synthetic'; end
     cam = camera_open(P);
@@ -198,6 +207,10 @@ if useCam
     camLat = realtime*P.cam.latency;              % the virtual camera has no latency
     fprintf('Following: %s (P.trk.source)\n', P.trk.source);
     trkSrc = 'none';
+    gz = [];                                     % gaze follow state (P.gzf, gaze_follow.m)
+    if followCam && P.gzf.on
+        fprintf('Gaze follow ON: look straight at the camera until the live view says "gaze zeroed".\n');
+    end
 end
 if SHOW && useCam, V = viz_live_init(P, sprintf('run_rig %s (%s)', TASK, MODE)); end
 
@@ -207,7 +220,8 @@ refPrev = y; tiltCmd = [0 0];
 refNow = [y; 0; 0]; vFF = 0; vFFraw = 0; yStep0 = y;
 L = struct('task', TASK, 'mode', MODE, 't', t, 'ref', nan(3, n), 'y', nan(1, n), 'V', nan(1, n), ...
            'loopMs', nan(1, n), 'ok', false(1, n), 'head', nan(3, n), 'statusCode', nan(1, n), ...
-           'gaze', nan(2, n), 'frameMs', nan(1, n), 'srcCode', nan(1, n), 'nOverrun', 0, 'nGuard', 0, 'tReal', nan(1, n));
+           'gaze', nan(2, n), 'frameMs', nan(1, n), 'srcCode', nan(1, n), 'nOverrun', 0, 'nGuard', 0, 'tReal', nan(1, n), ...
+           'gazeDeg', nan(1, n), 'glints', nan(1, n), 'hold', false(1, n));
 codes = {'search', 'track', 'blink', 'lost'};
 fprintf('Running %s for %.0f s (%s). Close the window or Ctrl-C to stop.\n', TASK, TRUN, MODE);
 tk.t0 = tic; tPrevLoop = 0; tBigErr = 0;
@@ -223,87 +237,102 @@ for k = 1:n
     switch TASK
         case 'track_synthetic'
             refNow = Rref(:, k); vFF = 0;
-        case 'step'                              % square wave: centre, +size, centre, ...
+        case {'step', 'step_camera'}             % square wave: centre, +size, centre, ...
             up = mod(floor(tNow/P.stepTest.period), 2) == 1;
-            refNow = [yStep0 + up*P.stepTest.size/M.r; 0; 0]; vFF = 0;
+            refNow(1) = yStep0 + up*P.stepTest.size/M.r; vFF = 0;   % (2:3): servos, set by the camera in step_camera
             if tNow > TRUN, break, end           % real time (n is only an upper bound)
-        case 'track_camera'
-            if mod(k - 1, P.cam.every) == 0
-                tf0 = toc(tk.t0);
-                ctx = struct('t', tNow, 'xCar', xCar, 'led', logical(P.led.on), 'tilt', tiltCmd);
-                [cam, img, inf_] = camera_read(cam, P, ctx);
-                if inf_.ok
-                    tFrame = tNow; if realtime, tFrame = toc(tk.t0); end
-                    % carriage position WHEN THE FRAME WAS TAKEN (not now): otherwise the
-                    % carriage's own motion appears as head motion -> oscillation
-                    xCam = xCar;
-                    if camLat > 0
-                        ih = max(1, k - 100):k; ih = ih(~isnan(tHist(ih)));
-                        tc = min(max(tFrame - camLat, tHist(ih(1))), tHist(ih(end)));
-                        if numel(ih) > 1, xCam = interp1(tHist(ih), xHist(ih), tc); end
+    end
+    if useCam
+        if mod(k - 1, P.cam.every) == 0
+            tf0 = toc(tk.t0);
+            ctx = struct('t', tNow, 'xCar', xCar, 'led', logical(P.led.on), 'tilt', tiltCmd);
+            [cam, img, inf_] = camera_read(cam, P, ctx);
+            if inf_.ok
+                tFrame = tNow; if realtime, tFrame = toc(tk.t0); end
+                % carriage position WHEN THE FRAME WAS TAKEN (not now): otherwise the
+                % carriage's own motion appears as head motion -> oscillation
+                xCam = xCar;
+                if camLat > 0
+                    ih = max(1, k - 100):k; ih = ih(~isnan(tHist(ih)));
+                    tc = min(max(tFrame - camLat, tHist(ih(1))), tHist(ih(end)));
+                    if numel(ih) > 1, xCam = interp1(tHist(ih), xHist(ih), tc); end
+                end
+                imgE = img;
+                if useFace                   % face first; pupils only inside the face
+                    [fbox, fd] = face_find(fd, img, P, fbox);
+                    imgE = face_mask(img, fbox);
+                end
+                if useFace && strcmp(P.det.method, 'face')
+                    det = eye_in_face(img, fbox, P);   % iris inside the face box
+                else
+                    det = eye_detect(imgE, P, eye_tracker_prior(T, tFrame, P));
+                end
+                [T, obs] = eye_tracker_update(T, det, tFrame, P);
+                [H, T] = head_estimate(obs, T, xCam, P);
+                eyesTrk = ~any(strcmp(obs.status, {'search', 'lost'}));
+                if useFace, [Hf, zFace] = face_head(fbox, H, zFace, xCam, P); end
+                if useBoth && eyesTrk && H.valid
+                    trkSrc = 'eyes';         % both: pupils found inside the face box
+                elseif useFace
+                    H = Hf; trkSrc = 'face';
+                    if ~H.valid, trkSrc = 'none'; end
+                else
+                    trkSrc = 'eyes'; if ~eyesTrk, trkSrc = 'none'; end
+                end
+                L.srcCode(k) = find(strcmp({'none', 'face', 'eyes'}, trkSrc)) - 1;
+                dtf = tFrame - tLastFrame; if isnan(dtf), dtf = P.cam.every*P.Ts; end
+                tLastFrame = tFrame;
+                [kf, pHat, vHat] = eye_filter(kf, H.pos, dtf, P, H.valid);
+                trackOk = ~strcmp(trkSrc, 'none');
+                % gaze follow: iris position inside the face box -> where the eyes look
+                [gz, gzDeg] = gaze_follow(gz, obs, fbox, H, tFrame, strcmp(trkSrc, 'eyes'), P);
+                L.gazeDeg(k) = gzDeg;
+                L.glints(k) = sum(arrayfun(@(x) size(x.glints, 1) > 0, det.eyes));
+                if ~followCam && ~any(isnan(pHat)) && trackOk
+                    refNew = refs_from_eye(P, pHat);
+                    refNow(2:3) = refNew(2:3);   % step_camera: the servos still aim at the eyes
+                elseif ~followCam
+                    % keep the step reference
+                elseif ~any(isnan(pHat)) && trackOk
+                    refNew = refs_from_eye(P, pHat);
+                    if P.gzf.on && ~isnan(gzDeg)   % carriage to the point the eyes look at
+                        xg = pHat(1) + H.z*tand(gzDeg);
+                        refNew(1) = min(max(xg, P.belt.xMin), P.belt.xMax)/M.r;
                     end
-                    imgE = img;
-                    if useFace                   % face first; pupils only inside the face
-                        [fbox, fd] = face_find(fd, img, P, fbox);
-                        imgE = face_mask(img, fbox);
+                    if abs(refNew(1)*M.r - refNow(1)*M.r) < P.trk.deadband
+                        refNew(1) = refNow(1);   % dead band: ignore small head moves / jitter
                     end
-                    if useFace && strcmp(P.det.method, 'face')
-                        det = eye_in_face(img, fbox, P);   % iris inside the face box
-                    else
-                        det = eye_detect(imgE, P, eye_tracker_prior(T, tFrame, P));
+                    refNow = refNew;
+                    inside = refNow(1)*M.r > P.belt.xMin && refNow(1)*M.r < P.belt.xMax;
+                    vFFraw = P.trk.useVelFF*inside*vHat(1)/M.r;
+                else
+                    refNow(1) = refPrev; vFFraw = 0;   % hold position while searching
+                end
+                G = [];
+                if ~isempty(gcal)
+                    G = gaze_calib_apply(gcal, gaze_features(obs, H, P), P);
+                    if G.valid
+                        if isempty(Gs), Gs = G.uv; else, Gs = (1 - P.gcal.smooth)*G.uv + P.gcal.smooth*Gs; end
+                        G.uv = Gs; G.px = Gs.*P.screen.res(:); L.gaze(:, k) = G.uv;
                     end
-                    [T, obs] = eye_tracker_update(T, det, tFrame, P);
-                    [H, T] = head_estimate(obs, T, xCam, P);
-                    eyesTrk = ~any(strcmp(obs.status, {'search', 'lost'}));
-                    if useFace, [Hf, zFace] = face_head(fbox, H, zFace, xCam, P); end
-                    if useBoth && eyesTrk && H.valid
-                        trkSrc = 'eyes';         % both: pupils found inside the face box
-                    elseif useFace
-                        H = Hf; trkSrc = 'face';
-                        if ~H.valid, trkSrc = 'none'; end
-                    else
-                        trkSrc = 'eyes'; if ~eyesTrk, trkSrc = 'none'; end
-                    end
-                    L.srcCode(k) = find(strcmp({'none', 'face', 'eyes'}, trkSrc)) - 1;
-                    dtf = tFrame - tLastFrame; if isnan(dtf), dtf = P.cam.every*P.Ts; end
-                    tLastFrame = tFrame;
-                    [kf, pHat, vHat] = eye_filter(kf, H.pos, dtf, P, H.valid);
-                    trackOk = ~strcmp(trkSrc, 'none');
-                    if ~any(isnan(pHat)) && trackOk
-                        refNew = refs_from_eye(P, pHat);
-                        if abs(refNew(1)*M.r - refNow(1)*M.r) < P.trk.deadband
-                            refNew(1) = refNow(1);   % dead band: ignore small head moves / jitter
-                        end
-                        refNow = refNew;
-                        inside = refNow(1)*M.r > P.belt.xMin && refNow(1)*M.r < P.belt.xMax;
-                        vFFraw = P.trk.useVelFF*inside*vHat(1)/M.r;
-                    else
-                        refNow(1) = refPrev; vFFraw = 0;   % hold position while searching
-                    end
-                    G = [];
-                    if ~isempty(gcal)
-                        G = gaze_calib_apply(gcal, gaze_features(obs, H, P), P);
-                        if G.valid
-                            if isempty(Gs), Gs = G.uv; else, Gs = (1 - P.gcal.smooth)*G.uv + P.gcal.smooth*Gs; end
-                            G.uv = Gs; G.px = Gs.*P.screen.res(:); L.gaze(:, k) = G.uv;
-                        end
-                    end
-                    L.head(:, k) = H.pos; L.statusCode(k) = find(strcmp(codes, obs.status)) - 1;
-                    L.frameMs(k) = (toc(tk.t0) - tf0)*1e3;
-                    if SHOW
-                        if ~viz_alive(V.fig), break, end
-                        V = viz_live_update(V, tNow, img, det, obs, H, G, xCar, ...
-                            struct('loop_ms', round(median_valid(L.loopMs(max(1,k-50):k))), ...
-                                   'link_err', io.nErr, 'frame_ms', round(L.frameMs(k)), 'follows', trkSrc));
-                        if useFace && isfield(V, 'hDet') && ~isempty(V.hDet)   % magenta face box
-                            if isempty(hFace) || ~ishghandle(hFace), hFace = plot(V.axCam, NaN, NaN, 'm-', 'LineWidth', 2); end
-                            if isempty(fbox), set(hFace, 'XData', NaN, 'YData', NaN);
-                            else, b = fbox; set(hFace, 'XData', b(1) + [0 b(3) b(3) 0 0] - 0.5, ...
-                                                      'YData', b(2) + [0 0 b(4) b(4) 0] - 0.5); end
-                        end
+                end
+                L.head(:, k) = H.pos; L.statusCode(k) = find(strcmp(codes, obs.status)) - 1;
+                L.frameMs(k) = (toc(tk.t0) - tf0)*1e3;
+                if SHOW
+                    if ~viz_alive(V.fig), break, end
+                    V = viz_live_update(V, tNow, img, det, obs, H, G, xCar, ...
+                        struct('loop_ms', round(median_valid(L.loopMs(max(1,k-50):k))), ...
+                               'link_err', io.nErr, 'frame_ms', round(L.frameMs(k)), 'follows', ...
+                               [trkSrc gz.label]));
+                    if useFace && isfield(V, 'hDet') && ~isempty(V.hDet)   % magenta face box
+                        if isempty(hFace) || ~ishghandle(hFace), hFace = plot(V.axCam, NaN, NaN, 'm-', 'LineWidth', 2); end
+                        if isempty(fbox), set(hFace, 'XData', NaN, 'YData', NaN);
+                        else, b = fbox; set(hFace, 'XData', b(1) + [0 b(3) b(3) 0 0] - 0.5, ...
+                                                  'YData', b(2) + [0 0 b(4) b(4) 0] - 0.5); end
                     end
                 end
             end
+        end
     end
     if useCam                                    % low-passed velocity feed-forward
         aF = min(1, dt/P.trk.vffTau); vFF = vFF + aF*(vFFraw - vFF);
@@ -316,8 +345,9 @@ for k = 1:n
     refSteady = abs(ref(1) - refPrev) < 1e-9;
     refPrev = ref(1);
     Vff = M.Ke*vFF + M.R*M.Tc/M.Kt*tanh(vFF/0.05);
-    if useHold && refSteady && abs(ref(1) - y)*M.r < P.trk.holdBand
-        Vm = 0; st.yPrev = y; st.D = 0;          % close enough and target still: motor off, no hunting
+    [hold, holding] = hold_band(holding, refSteady, abs(ref(1) - y)*M.r, P);
+    if useHold && hold
+        Vm = 0; st.yPrev = y; st.D = 0;          % at the target and target still: motor off, no hunting
     else
         [Vm, st] = pid_step(st, C, M, P, ref(1), y, Vff, dt);
     end
@@ -339,7 +369,7 @@ for k = 1:n
     cmd.servoUs = [toUs(ref(2), 1), toUs(ref(3), 2)];
     cmd.led = logical(P.led.on);
 
-    L.ref(:, k) = ref; L.y(k) = y; L.V(k) = Vm; L.ok(k) = fb.ok; L.tReal(k) = tNow;
+    L.ref(:, k) = ref; L.y(k) = y; L.V(k) = Vm; L.ok(k) = fb.ok; L.tReal(k) = tNow; L.hold(k) = useHold && hold;
     L.loopMs(k) = (toc(tk.t0) - tNow)*1e3*realtime;
     if ~rig_tick_wait(tk, k), L.nOverrun = L.nOverrun + 1; end
 end
@@ -357,6 +387,24 @@ save(logFile, 'L', 'P', 'C');
 fprintf('Log: %s\n', logFile);
 e = (L.ref(1,:) - L.y)*M.r*1e3;
 fprintf('Carriage tracking error: RMS %.2f mm, max %.2f mm\n', sqrt(mean(e(~isnan(e)).^2)), max(abs(e)));
+if useCam
+    kf_ = ~isnan(L.glints) & L.srcCode == 2;     % frames with the eyes tracked
+    if any(kf_)
+        fprintf('IR glint (LED reflection) on the iris: >= 1 eye in %.0f %% of eye frames, both eyes in %.0f %%\n', ...
+                100*mean(L.glints(kf_) >= 1), 100*mean(L.glints(kf_) == 2));
+    end
+    if any(~isnan(L.gazeDeg))
+        fprintf('Gaze follow: angle %+.0f to %+.0f deg (P.gzf.on = %d)\n', min(L.gazeDeg), max(L.gazeDeg), P.gzf.on);
+    end
+end
+if strcmp(TASK, 'step') || strcmp(TASK, 'step_camera')
+    lv = L.tReal; ok_ = ~isnan(L.y);
+    for j = 1:floor(max(lv(ok_))/P.stepTest.period)
+        i = find(ok_ & lv < j*P.stepTest.period, 1, 'last');
+        fprintf('step %d: error at the end %.2f mm\n', j, (L.ref(1, i) - L.y(i))*M.r*1e3);
+    end
+    if useCam, fprintf('Loop time with the camera: median %.0f ms\n', median_valid(L.loopMs)); end
+end
 if useCam && ~realtime                          % virtual: compare with the virtual user's head
     ok = ~isnan(L.head(1,:));
     S = synth_scene(P, 'demo'); hx = arrayfun(@(tt) S.at(tt).head(1), t(ok));

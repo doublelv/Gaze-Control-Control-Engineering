@@ -19,7 +19,7 @@ P.bSP = P.trk.bSP;
 if nargin >= 3 && ~isempty(bSP), P.bSP = bSP; end            % what-if: other set-point weight
 if nargin >= 4 && ~isempty(Cnew), C = Cnew; end              % what-if: other PID gains
 x = [L.y(k(1)); 0; 0]; Vapp = 0;
-st = struct('I', 0, 'D', 0, 'yPrev', x(1));
+st = struct('I', 0, 'D', 0, 'yPrev', x(1)); holding = false;
 n = numel(k); ySim = nan(1, n); VSim = nan(1, n);
 dtSub = 1e-4; Mt = sub_model(P, dtSub);
 for j = 1:n
@@ -28,7 +28,8 @@ for j = 1:n
     if j < n, dt = tr(k(j+1)) - tr(i); else, dt = L.loopMs(i)/1e3; end
     ref = L.ref(1, i);
     steady = j > 1 && abs(ref - L.ref(1, k(j-1))) < 1e-9;
-    if steady && abs(ref - y)*M.r < P.trk.holdBand
+    [hold, holding] = hold_band(holding, steady, abs(ref - y)*M.r, P);   % (old logs: no hysteresis)
+    if hold
         Vm = 0; st.yPrev = y; st.D = 0;
     else
         [Vm, st] = pid_step(st, C, M, P, ref, y, 0, dt);

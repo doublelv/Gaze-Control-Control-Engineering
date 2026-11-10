@@ -1,12 +1,13 @@
 function test_run_rig()
 %TEST_RUN_RIG  End-to-end: the real run_rig script in virtual mode (simulated
 %   Nucleo + motor + camera): io_check, homing + synthetic tracking, homing +
-%   camera tracking. Checks link errors, tracking error and that the camera
-%   follows the virtual user's head.
-envs = {'RIG_MODE', 'RIG_TASK', 'RIG_TRUN', 'RIG_SHOW', 'RIG_FACE_STUB', 'RIG_SOURCE', 'RIG_DET_METHOD'};
+%   camera tracking, step and step_camera (zero steady-state error), gaze follow.
+%   Checks link errors, tracking error and that the camera follows the virtual user's head.
+envs = {'RIG_MODE', 'RIG_TASK', 'RIG_TRUN', 'RIG_SHOW', 'RIG_FACE_STUB', 'RIG_SOURCE', 'RIG_DET_METHOD', 'RIG_GZF'};
 c = onCleanup(@() cellfun(@(e) setenv(e, ''), envs));
 setenv('RIG_MODE', 'virtual'); setenv('RIG_SHOW', '0');
 setenv('RIG_SOURCE', 'eyes');            % synthetic eyes (params.m default is 'face')
+setenv('RIG_GZF', '0');                  % head following (gaze follow: own check at the end)
 r = run_task('io_check', 0);
 assert(r.io.nErr == 0, 'io_check link errors');
 r = run_task('track_synthetic', 4);
@@ -25,6 +26,18 @@ sm = step_metrics(r.L.tReal(k) - 3, ys, 0, sz);
 iout = find(abs(ys - sz) > max(0.05*sz, r.P.trk.holdBand + 0.5e-3), 1, 'last'); ts = r.L.tReal(k(min(iout + 1, end))) - 3;
 assert(sm.OS < 5, 'step overshoot %.1f %%', sm.OS);
 assert(ts < 1.5, 'step settling %.2f s', ts);
+% zero steady-state error: hold band 0.3 mm (hold_band.m), the integrator removes the rest
+ess = abs(r.L.ref(1, k(end)) - r.L.y(k(end)))*r.M.r;
+assert(ess <= r.P.trk.holdExit, 'step steady-state error %.2f mm', ess*1e3);
+h = r.L.hold(k); assert(sum(abs(diff(h))) <= 2, 'hold band hunting: %d on/off switches', sum(abs(diff(h))));
+% step_camera: same square wave while the (synthetic) camera and detection run
+r = run_task('step_camera', 6);
+k = find(r.L.tReal >= 3 & r.L.tReal < 6);
+y0 = r.L.ref(1, k(1) - 1); ys = (r.L.y(k) - y0)*r.M.r;
+sm = step_metrics(r.L.tReal(k) - 3, ys, 0, sz);
+assert(sm.OS < 5, 'step_camera overshoot %.1f %%', sm.OS);
+assert(abs(ys(end) - sz) <= r.P.trk.holdExit, 'step_camera final error %.2f mm', abs(ys(end) - sz)*1e3);
+assert(nnz(~isnan(r.L.head(1, :))) > 20, 'step_camera: camera/detection did not run');
 % same 1 Hz limit as above: the camera lags the moving synthetic head (~50 mm RMS)
 r = run_task('track_camera', 5);
 ok = ~isnan(r.L.head(1,:)) & r.L.t > 2;
@@ -54,6 +67,14 @@ hx = arrayfun(@(tt) S.at(tt).head(1), r.L.t(ok));
 off = (hx - r.L.y(ok)*r.M.r)*1e3;
 assert(sqrt(mean(off.^2)) < 70, 'both: camera-to-head offset RMS %.1f mm', sqrt(mean(off.^2)));
 fprintf('both: followed eyes %d, face %d, none %d frames\n', nnz(r.L.srcCode == 2), nnz(r.L.srcCode == 1), nnz(r.L.srcCode == 0));
+% gaze follow on (params.m default): runs, zeroes, and stays inside the software limits
+setenv('RIG_FACE_STUB', 'face_stub_synthetic'); setenv('RIG_SOURCE', 'both'); setenv('RIG_DET_METHOD', 'pupil'); setenv('RIG_GZF', '1');
+r = run_task('track_camera', 5);
+setenv('RIG_FACE_STUB', ''); setenv('RIG_DET_METHOD', ''); setenv('RIG_GZF', '0');
+assert(any(~isnan(r.L.gazeDeg)), 'gaze follow: never zeroed / no angle');
+x = r.L.y(~isnan(r.L.y))*r.M.r;
+assert(all(x > r.P.belt.xMin - 0.005 & x < r.P.belt.xMax + 0.005), 'gaze follow: carriage outside the limits');
+fprintf('gaze follow: angle %+.0f..%+.0f deg\n', min(r.L.gazeDeg), max(r.L.gazeDeg));
 end
 
 function r = run_task(task, trun)
