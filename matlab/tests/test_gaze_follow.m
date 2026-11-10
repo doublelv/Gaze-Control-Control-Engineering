@@ -21,7 +21,7 @@ for B = [1 1.9 3]
     % look 25 deg toward +x for 5 s, then -25 deg for 5 s
     [x, gz, tt] = loop(P, eyes, H, B, @(t) 25*(t >= 4 & t < 9) - 25*(t >= 9), 14);
     x1 = x(find(tt < 9, 1, 'last')); x2 = x(end);
-    xEq = z*tand((25 - P.gzf.deadDeg)/(B - P.gzf.Bcomp));   % where the eyes look at the camera again
+    xEq = z*tand(min(P.gzf.maxDeg, (25 - P.gzf.deadDeg)/(B - P.gzf.Bcomp)));   % eyes look at the camera again (or limit)
     assert(x1 > 0.6*xEq && x1 < 1.4*xEq + 0.01, 'B %.1f: +25 deg -> %.0f mm (expected ~%.0f)', B, x1*1e3, xEq*1e3);
     assert(x2 < -0.6*xEq, 'B %.1f: -25 deg -> %.0f mm', B, x2*1e3);
     assert(strcmp(gz.phase, 'run'), 'B %.1f: switched off (%s)', B, gz.phase);
@@ -32,7 +32,7 @@ end
 
 % oscillation guard: eyes flipping fast from side to side -> off
 P2 = P; P2.gzf.Ki = 20;
-[~, gz] = loop(P2, eyes, H, 1.9, @(t) 30*(t > 3)*sign(sin(2*pi*1.0*t)), 12);
+[~, gz] = loop(P2, eyes, H, 1.9, @(t) 15*(t > 3)*sign(sin(2*pi*1.0*t)), 12);
 assert(strcmp(gz.phase, 'off'), 'oscillation guard did not switch off (%s)', gz.phase);
 
 % blink: psi held, then back to 0 after P.gzf.lostT

@@ -301,6 +301,8 @@ P.trk.holdBand  = 0.0003;   % motor off once the target is still and |error| < t
                             %   was 3 mm until 2026-11-09: the motor then stopped 0.7-2.6 mm short
                             %   (no integral action inside the band); 0.3 mm = ~11 encoder counts
 P.trk.holdExit  = 0.001;    % ... and on again when |error| > this [m] (hysteresis: no hunting)
+P.trk.Vlim      = 6;        % camera tasks: motor voltage limit [V] (PSU 12 V). The 50 mm steps need < 5 V;
+                            %   the Nucleo reset twice on 2026-11-10 while gaze follow drove up to 9-12 V
 
 %% Gaze follow (gaze_estimation/gaze_follow.m, run_rig track_camera)
 %  The camera moves toward where the eyes look and stops when the eyes look at it:
@@ -313,11 +315,13 @@ P.gzf.on        = true;     % false: follow the head only
 P.gzf.tZero     = 2.0;      % zeroing: look at the camera this long [s]
 P.gzf.minSamples= 10;       % frames needed for the zeroing
 P.gzf.rEye      = 0.011;    % eyeball centre to iris centre [m] (eye models: ~10-11 mm)
-P.gzf.Ki        = 1.5;      % camera angle speed per degree of eye angle [1/s]  [tune: higher = faster]
+P.gzf.Ki        = 0.8;      % camera angle speed per degree of eye angle [1/s]  [tune: higher = faster]
+                            %   (1.5 on the rig 2026-11-10: camera slammed end to end at up to 9 V)
 P.gzf.Bcomp     = 0.5;      % part of the camera's own effect removed (0..0.8): higher = camera travels further
 P.gzf.deadDeg   = 5;        % eye angles below this are "looking at the camera" [deg]
                             %   (1 px of iris or face-box jitter is ~5 deg at 50 cm)  [tune: lower = more motion]
-P.gzf.maxDeg    = 40;       % limit on psi [deg]
+P.gzf.maxDeg    = 25;       % limit on psi [deg] (beyond ~30 deg the eyes are seen too much from the side)
+P.gzf.mMax      = 45;       % eye angles above this are wrong iris detections (7 % of frames on the rig) [deg]
 P.gzf.lostT     = 1.0;      % eyes lost longer than this [s] ...
 P.gzf.lostTau   = 1.0;      % ... psi returns to 0 with this time constant [s]
 P.gzf.oscDeg    = 8;        % oscillation guard: psi beyond +-this counts as one side [deg]
