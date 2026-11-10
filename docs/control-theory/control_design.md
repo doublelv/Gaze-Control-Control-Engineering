@@ -61,14 +61,16 @@ target is still and the error is below 0.3 mm (`P.trk.holdBand`), and on again a
 (`P.trk.holdExit`). Until 2026-11-09 the band was 3 mm without hysteresis; the motor then stopped
 0.7-2.6 mm short of a 50 mm step, because the integrator does not act while the motor is off.
 
-Gaze follow (`gaze_follow.m`, `P.gzf`, track_camera): the iris offset inside the face box gives
-an angle $m = \arcsin(d/r_{eye})$ relative to the camera. When the camera itself moves by the angle
-$\varphi = \arctan((x_{cam} - x_{head})/z)$ the eyes look turned by about $-B\varphi$ even if they
-do not move; the first version (2026-11-10) ignored this and the carriage chased its own motion
-(left-right oscillation, runaway stop on the rig). Now a ~10 s start-up calibration (user looks at
-one fixed point; zeroing, then the carriage moves to -60/+60/0 mm) fits $B$; tracking uses
-$\theta = m + 0.8\,B(\varphi - \varphi_0)$ and the reference $x_{head} + z\tan\theta$. A poor fit, or the
-angle swinging left-right 4 times in 4 s, switches gaze follow off (head following only).
+Gaze follow (`gaze_follow.m`, `P.gzf`, track_camera): visual servoing on the iris. After a 2 s
+zeroing (user looks at the camera) the iris offset inside the face box gives the eye angle relative
+to the camera, $m = \arcsin(d/r_{eye})$. The camera angle $\psi$ integrates it,
+$\dot\psi = K_i\,\mathrm{dz}(m + B_c(\varphi - \varphi_0))$ ($K_i$ 1.5 s$^{-1}$, dead zone 5 deg,
+$B_c$ 0.5), and the carriage reference is $x_{head} + z\tan\psi$: the camera moves toward the side the
+eyes look at and stops when they look at it again. The camera's own motion reduces $m$
+(negative feedback), so no calibration is needed. History: a direct $x_{head} + z\tan m$ (no
+integrator) ran away on the rig on 2026-11-10, and a start-up calibration of the camera effect
+failed on the rig ($R^2 < 0$). Safety: 4 left-right swings in 4 s switch gaze follow off.
+Servo LED angles are low-passed (0.3 s) with a 1.5 deg dead band (`P.srv.tauAim`, `deadAim`).
 
 ## 3. Reference generation (MIMO coordinator, `refs_from_eye.m`)
 One head estimate drives three axes:

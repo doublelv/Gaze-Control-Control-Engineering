@@ -209,9 +209,8 @@ if useCam
     trkSrc = 'none';
     gz = [];                                     % gaze follow state (P.gzf, gaze_follow.m)
     if followCam && P.gzf.on
-        fprintf(['Gaze follow ON: first ~10 s calibration. Look at ONE fixed point straight ahead\n', ...
-                 '  (e.g. the middle of the laptop screen), keep the head still and do NOT follow\n', ...
-                 '  the camera while it moves left and right. The live view shows the steps.\n']);
+        fprintf(['Gaze follow ON: look AT THE CAMERA for the first ~2 s (zeroing).\n', ...
+                 '  Then look left or right: the camera moves that way and stops when you look at it.\n']);
     end
 end
 if SHOW && useCam, V = viz_live_init(P, sprintf('run_rig %s (%s)', TASK, MODE)); end
@@ -225,10 +224,9 @@ L = struct('task', TASK, 'mode', MODE, 't', t, 'ref', nan(3, n), 'y', nan(1, n),
            'gaze', nan(2, n), 'frameMs', nan(1, n), 'srcCode', nan(1, n), 'nOverrun', 0, 'nGuard', 0, 'tReal', nan(1, n), ...
            'gazeDeg', nan(1, n), 'glints', nan(1, n), 'hold', false(1, n), 'uPID', nan(3, n), ...
            'gazeM', nan(1, n), 'gazePhi', nan(1, n));
-xCentre = 0.5*(P.belt.xMin + P.belt.xMax);       % rail centre [m] (gaze calibration)
 codes = {'search', 'track', 'blink', 'lost'};
 fprintf('Running %s for %.0f s (%s). Close the window or Ctrl-C to stop.\n', TASK, TRUN, MODE);
-tk.t0 = tic; tPrevLoop = 0; tBigErr = 0; stopMsg = '';
+tk.t0 = tic; tPrevLoop = 0; tBigErr = 0; stopMsg = ''; aimF = [NaN NaN]; aimS = [NaN NaN];
 for k = 1:n
     tNow = toc(tk.t0);
     if ~realtime, tNow = t(k); end
@@ -302,21 +300,16 @@ for k = 1:n
                     % keep the step reference
                 elseif ~any(isnan(pHat)) && trackOk
                     refNew = refs_from_eye(P, pHat);
-                    if ~isempty(gz) && ~isnan(gz.calRef)   % gaze calibration moves the carriage
-                        refNew(1) = min(max(xCentre + gz.calRef, P.belt.xMin), P.belt.xMax)/M.r;
-                        refNow = refNew; vFFraw = 0;
-                    elseif P.gzf.on && ~isnan(gzDeg)   % carriage to the point the eyes look at
+                    if P.gzf.on && ~isnan(gzDeg)   % camera toward where the eyes look
                         xg = pHat(1) + H.z*tand(gzDeg);
                         refNew(1) = min(max(xg, P.belt.xMin), P.belt.xMax)/M.r;
                     end
-                    if isempty(gz) || isnan(gz.calRef)
-                        if abs(refNew(1)*M.r - refNow(1)*M.r) < P.trk.deadband
-                            refNew(1) = refNow(1);   % dead band: ignore small head moves / jitter
-                        end
-                        refNow = refNew;
-                        inside = refNow(1)*M.r > P.belt.xMin && refNow(1)*M.r < P.belt.xMax;
-                        vFFraw = P.trk.useVelFF*inside*vHat(1)/M.r;
+                    if abs(refNew(1)*M.r - refNow(1)*M.r) < P.trk.deadband
+                        refNew(1) = refNow(1);   % dead band: ignore small head moves / jitter
                     end
+                    refNow = refNew;
+                    inside = refNow(1)*M.r > P.belt.xMin && refNow(1)*M.r < P.belt.xMax;
+                    vFFraw = P.trk.useVelFF*inside*vHat(1)/M.r;
                 else
                     refNow(1) = refPrev; vFFraw = 0;   % hold position while searching
                 end
@@ -333,6 +326,7 @@ for k = 1:n
                 gzLabel = ''; if ~isempty(gz), gzLabel = gz.label; end
                 if SHOW
                     if ~viz_alive(V.fig), break, end
+                    try
                     V = viz_live_update(V, tNow, img, det, obs, H, G, xCar, ...
                         struct('loop_ms', round(median_valid(L.loopMs(max(1,k-50):k))), ...
                                'link_err', io.nErr, 'frame_ms', round(L.frameMs(k)), 'follows', ...
@@ -342,6 +336,9 @@ for k = 1:n
                         if isempty(fbox), set(hFace, 'XData', NaN, 'YData', NaN);
                         else, b = fbox; set(hFace, 'XData', b(1) + [0 b(3) b(3) 0 0] - 0.5, ...
                                                   'YData', b(2) + [0 0 b(4) b(4) 0] - 0.5); end
+                    end
+                    catch                        % window closed while drawing: stop, keep the log
+                        break
                     end
                 end
             end
@@ -380,6 +377,13 @@ for k = 1:n
         L.nGuard = L.nGuard + 1;
     end
     cmd.duty = Vm/M.Vmax*P.drv.pwmCounts;
+    % servo LEDs: low-pass + dead band on the aim angle (estimate jumps -> no twitching)
+    aimRaw = ref(2:3)';
+    if any(isnan(aimS)), aimS = aimRaw; aimF = aimRaw; end
+    aimS = aimS + min(1, max(dt, P.Ts)/P.srv.tauAim)*(aimRaw - aimS);   % smoothed
+    upd = abs(aimS - aimF)*180/pi >= P.srv.deadAim;                      % command moves in steps
+    aimF(upd) = aimS(upd);
+    if useCam, ref(2:3) = aimF'; end
     tiltCmd = ref(2:3)';
     cmd.servoUs = [toUs(ref(2), 1), toUs(ref(3), 2)];
     cmd.led = logical(P.led.on);
@@ -429,4 +433,7 @@ if useCam && ~realtime                          % virtual: compare with the virt
     eh = eh(t(ok) > 2);
     fprintf('Camera offset from the head (true, t > 2 s): RMS %.1f mm, max %.1f mm\n', sqrt(mean(eh.^2)), max(abs(eh)));
 end
-if SHOW, plot_rig_log(L, P); end
+if SHOW
+    plot_rig_log(L, P);
+    if any(~isnan(L.uPID(1, :))), plot_pid_terms(logFile); end   % P, I, D terms (saved as PNG)
+end
