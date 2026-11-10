@@ -209,7 +209,9 @@ if useCam
     trkSrc = 'none';
     gz = [];                                     % gaze follow state (P.gzf, gaze_follow.m)
     if followCam && P.gzf.on
-        fprintf('Gaze follow ON: look straight at the camera until the live view says "gaze zeroed".\n');
+        fprintf(['Gaze follow ON: first ~10 s calibration. Look at ONE fixed point straight ahead\n', ...
+                 '  (e.g. the middle of the laptop screen), keep the head still and do NOT follow\n', ...
+                 '  the camera while it moves left and right. The live view shows the steps.\n']);
     end
 end
 if SHOW && useCam, V = viz_live_init(P, sprintf('run_rig %s (%s)', TASK, MODE)); end
@@ -221,10 +223,12 @@ refNow = [y; 0; 0]; vFF = 0; vFFraw = 0; yStep0 = y;
 L = struct('task', TASK, 'mode', MODE, 't', t, 'ref', nan(3, n), 'y', nan(1, n), 'V', nan(1, n), ...
            'loopMs', nan(1, n), 'ok', false(1, n), 'head', nan(3, n), 'statusCode', nan(1, n), ...
            'gaze', nan(2, n), 'frameMs', nan(1, n), 'srcCode', nan(1, n), 'nOverrun', 0, 'nGuard', 0, 'tReal', nan(1, n), ...
-           'gazeDeg', nan(1, n), 'glints', nan(1, n), 'hold', false(1, n), 'uPID', nan(3, n));
+           'gazeDeg', nan(1, n), 'glints', nan(1, n), 'hold', false(1, n), 'uPID', nan(3, n), ...
+           'gazeM', nan(1, n), 'gazePhi', nan(1, n));
+xCentre = 0.5*(P.belt.xMin + P.belt.xMax);       % rail centre [m] (gaze calibration)
 codes = {'search', 'track', 'blink', 'lost'};
 fprintf('Running %s for %.0f s (%s). Close the window or Ctrl-C to stop.\n', TASK, TRUN, MODE);
-tk.t0 = tic; tPrevLoop = 0; tBigErr = 0;
+tk.t0 = tic; tPrevLoop = 0; tBigErr = 0; stopMsg = '';
 for k = 1:n
     tNow = toc(tk.t0);
     if ~realtime, tNow = t(k); end
@@ -285,8 +289,11 @@ for k = 1:n
                 [kf, pHat, vHat] = eye_filter(kf, H.pos, dtf, P, H.valid);
                 trackOk = ~strcmp(trkSrc, 'none');
                 % gaze follow: iris position inside the face box -> where the eyes look
-                [gz, gzDeg] = gaze_follow(gz, obs, fbox, H, tFrame, strcmp(trkSrc, 'eyes'), P);
-                L.gazeDeg(k) = gzDeg;
+                gzDeg = NaN;
+                if followCam
+                    [gz, gzDeg] = gaze_follow(gz, obs, fbox, H, xCam, tFrame, strcmp(trkSrc, 'eyes'), P);
+                    L.gazeDeg(k) = gzDeg; L.gazeM(k) = gz.m; L.gazePhi(k) = gz.phi;
+                end
                 L.glints(k) = sum(arrayfun(@(x) size(x.glints, 1) > 0, det.eyes));
                 if ~followCam && ~any(isnan(pHat)) && trackOk
                     refNew = refs_from_eye(P, pHat);
@@ -295,16 +302,21 @@ for k = 1:n
                     % keep the step reference
                 elseif ~any(isnan(pHat)) && trackOk
                     refNew = refs_from_eye(P, pHat);
-                    if P.gzf.on && ~isnan(gzDeg)   % carriage to the point the eyes look at
+                    if ~isempty(gz) && ~isnan(gz.calRef)   % gaze calibration moves the carriage
+                        refNew(1) = min(max(xCentre + gz.calRef, P.belt.xMin), P.belt.xMax)/M.r;
+                        refNow = refNew; vFFraw = 0;
+                    elseif P.gzf.on && ~isnan(gzDeg)   % carriage to the point the eyes look at
                         xg = pHat(1) + H.z*tand(gzDeg);
                         refNew(1) = min(max(xg, P.belt.xMin), P.belt.xMax)/M.r;
                     end
-                    if abs(refNew(1)*M.r - refNow(1)*M.r) < P.trk.deadband
-                        refNew(1) = refNow(1);   % dead band: ignore small head moves / jitter
+                    if isempty(gz) || isnan(gz.calRef)
+                        if abs(refNew(1)*M.r - refNow(1)*M.r) < P.trk.deadband
+                            refNew(1) = refNow(1);   % dead band: ignore small head moves / jitter
+                        end
+                        refNow = refNew;
+                        inside = refNow(1)*M.r > P.belt.xMin && refNow(1)*M.r < P.belt.xMax;
+                        vFFraw = P.trk.useVelFF*inside*vHat(1)/M.r;
                     end
-                    refNow = refNew;
-                    inside = refNow(1)*M.r > P.belt.xMin && refNow(1)*M.r < P.belt.xMax;
-                    vFFraw = P.trk.useVelFF*inside*vHat(1)/M.r;
                 else
                     refNow(1) = refPrev; vFFraw = 0;   % hold position while searching
                 end
@@ -318,12 +330,13 @@ for k = 1:n
                 end
                 L.head(:, k) = H.pos; L.statusCode(k) = find(strcmp(codes, obs.status)) - 1;
                 L.frameMs(k) = (toc(tk.t0) - tf0)*1e3;
+                gzLabel = ''; if ~isempty(gz), gzLabel = gz.label; end
                 if SHOW
                     if ~viz_alive(V.fig), break, end
                     V = viz_live_update(V, tNow, img, det, obs, H, G, xCar, ...
                         struct('loop_ms', round(median_valid(L.loopMs(max(1,k-50):k))), ...
                                'link_err', io.nErr, 'frame_ms', round(L.frameMs(k)), 'follows', ...
-                               [trkSrc gz.label]));
+                               [trkSrc gzLabel]));
                     if useFace && isfield(V, 'hDet') && ~isempty(V.hDet)   % magenta face box
                         if isempty(hFace) || ~ishghandle(hFace), hFace = plot(V.axCam, NaN, NaN, 'm-', 'LineWidth', 2); end
                         if isempty(fbox), set(hFace, 'XData', NaN, 'YData', NaN);
@@ -357,8 +370,9 @@ for k = 1:n
     if fb.ok && abs(ref(1) - y)*M.r > P.trk.maxErr, tBigErr = tBigErr + max(dt, P.Ts); else, tBigErr = 0; end
     if tBigErr > 1.0
         cmd.duty = 0; rig_exchange(io, cmd);
-        error('run_rig:runaway', 'Carriage %.0f mm away from its reference for 1 s -> STOPPED (encoder? wiring? blocked?)', ...
-              abs(ref(1) - y)*M.r*1e3);
+        stopMsg = sprintf('Carriage %.0f mm away from its reference for 1 s -> STOPPED (encoder? wiring? blocked?)', ...
+                          abs(ref(1) - y)*M.r*1e3);
+        break                                    % log is saved below, then the error is raised
     end
     % encoder guard: past a software limit, never drive further outward (overshoot, stalls)
     if (xCar >= P.belt.xMax && Vm > 0) || (xCar <= P.belt.xMin && Vm < 0)
@@ -386,6 +400,7 @@ d = fullfile(root, 'artifacts', 'logs'); if ~exist(d, 'dir'), mkdir(d); end
 logFile = fullfile(d, sprintf('rig_%s_%s.mat', TASK, datestr(now, 'yyyymmdd_HHMMSS')));
 save(logFile, 'L', 'P', 'C');
 fprintf('Log: %s\n', logFile);
+if ~isempty(stopMsg), error('run_rig:runaway', '%s (log saved)', stopMsg); end
 fprintf('PID: Kp %.2f V/rad, Ki %.2f V/(rad s), Kd %.3f V s/rad (plot: plot_pid_terms(''%s''))\n', C.Kp, C.Ki, C.Kd, logFile);
 e = (L.ref(1,:) - L.y)*M.r*1e3;
 fprintf('Carriage tracking error: RMS %.2f mm, max %.2f mm\n', sqrt(mean(e(~isnan(e)).^2)), max(abs(e)));
