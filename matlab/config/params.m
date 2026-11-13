@@ -305,28 +305,31 @@ P.trk.holdExit  = 0.001;    % ... and on again when |error| > this [m] (hysteres
 P.trk.Vlim      = 6;        % camera tasks: motor voltage limit [V] (PSU 12 V). The 50 mm steps need < 5 V;
                             %   the Nucleo reset twice on 2026-11-10 while gaze follow drove up to 9-12 V
 
-%% Gaze follow (gaze_estimation/gaze_follow.m, run_rig track_camera)
-%  The camera moves toward where the eyes look and stops when the eyes look at it:
-%  psi integrates the eye angle relative to the camera; carriage ref = x_head + z*tan(psi).
+%% Gaze follow (gaze_estimation/gaze_follow.m; run_rig track_gaze and track_camera)
+%  Look, then move: while the carriage stands, the gaze angle theta from straight ahead is
+%  measured from the iris position inside the face box; the carriage then goes to
+%  base + z*tan(theta) (base = head for track_camera, rail centre for track_gaze).
 %  Start: look at the camera for P.gzf.tZero s (zeroing).
-%  History 2026-11-10: "ref = x_head + z*tan(eye angle)" ran away on the rig (the camera's
-%  own motion changes the apparent eye angle, ~1.9x); a start-up calibration of that
-%  factor failed on the rig (R^2 < 0). The integrating form needs no calibration.
+%  History 2026-11-10: a direct continuous "ref = head + z*tan(eye angle)" ran away (the
+%  camera's own motion changes the apparent eye angle, ~1.9x); a start-up calibration of
+%  that factor failed (R^2 < 0); an integrating version ran to the rail ends (2026-11-13).
 P.gzf.on        = true;     % false: follow the head only
 P.gzf.xBase     = NaN;      % set by run_rig for TASK = 'track_gaze' (carriage base = rail centre)
 P.gzf.tZero     = 2.0;      % zeroing: look at the camera this long [s]
 P.gzf.minSamples= 10;       % frames needed for the zeroing
-P.gzf.rEye      = 0.011;    % eyeball centre to iris centre [m] (eye models: ~10-11 mm)
-P.gzf.Ki        = 0.8;      % camera angle speed per degree of eye angle [1/s]  [tune: higher = faster]
-                            %   (1.5 on the rig 2026-11-10: camera slammed end to end at up to 9 V)
-P.gzf.Bcomp     = 0.5;      % part of the camera's own effect removed (0..0.8): higher = camera travels further
-P.gzf.deadDeg   = 5;        % eye angles below this are "looking at the camera" [deg]
-                            %   (1 px of iris or face-box jitter is ~5 deg at 50 cm)  [tune: lower = more motion]
-P.gzf.maxDeg    = 25;       % limit on psi [deg] (beyond ~30 deg the eyes are seen too much from the side)
-P.gzf.mMax      = 45;       % eye angles above this are wrong iris detections (7 % of frames on the rig) [deg]
-P.gzf.lostT     = 1.0;      % eyes lost longer than this [s] ...
-P.gzf.lostTau   = 1.0;      % ... psi returns to 0 with this time constant [s]
-P.gzf.oscDeg    = 8;        % oscillation guard: psi beyond +-this counts as one side [deg]
+P.gzf.rEye      = 0.011;    % eyeball centre to iris centre [m] (eye models: ~10-11 mm); smaller = more motion
+P.gzf.Bx        = 0;        % extra face-box shift per degree of camera angle. Estimates from the rig logs
+                            %   range 0.3-1.9 (noisy), so 0 = pure eye geometry. With a true extra shift
+                            %   the camera stops short: at angle theta/(1 + extra) instead of theta.
+P.gzf.nAvg      = 5;        % frames averaged per look (median, ~0.5 s)
+P.gzf.alpha     = 0.6;      % each look moves the target by this part of the difference (no left-right swinging)
+P.gzf.settleMm  = 5;        % the carriage counts as standing within this of its reference [mm]
+P.gzf.deadDeg   = 4;        % a new target only if theta changed more than this [deg]
+                            %   (1 px of iris or face-box jitter is ~5 deg at 50 cm)
+P.gzf.maxDeg    = 35;       % limit on theta [deg]
+P.gzf.mMax      = 60;       % eye angles above this are wrong iris detections [deg]
+P.gzf.lostT     = 1.0;      % eyes lost longer than this -> theta = 0 [s]
+P.gzf.oscDeg    = 8;        % oscillation guard: theta beyond +-this counts as one side [deg]
 P.gzf.oscFlips  = 4;        % ... this many side changes ...
 P.gzf.oscWin    = 4;        % ... within this time [s] -> gaze follow off
 
