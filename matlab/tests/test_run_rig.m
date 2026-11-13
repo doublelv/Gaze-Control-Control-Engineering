@@ -76,6 +76,19 @@ assert(any(~isnan(r.L.gazeM)), 'gaze follow: no raw angles logged');
 x = r.L.y(~isnan(r.L.y))*r.M.r;
 assert(all(x > r.P.belt.xMin - 0.005 & x < r.P.belt.xMax + 0.005), 'gaze follow: carriage outside the limits');
 fprintf('gaze follow: phase %s, psi %+.1f deg, carriage %.0f..%.0f mm\n', r.gz.phase, r.gz.psi, min(x)*1e3, max(x)*1e3);
+% the three demo modes: face only, gaze only (both = track_camera above)
+setenv('RIG_FACE_STUB', 'face_stub_synthetic'); setenv('RIG_SOURCE', 'both'); setenv('RIG_DET_METHOD', 'pupil'); setenv('RIG_GZF', '');
+r = run_task('track_face', 5);
+assert(all(isnan(r.L.gazeDeg)), 'track_face: gaze follow should be off');
+ok = ~isnan(r.L.head(1,:)) & r.L.t > 2; hx = arrayfun(@(tt) S.at(tt).head(1), r.L.t(ok));
+off = (hx - r.L.y(ok)*r.M.r)*1e3;
+assert(sqrt(mean(off.^2)) < 70, 'track_face: camera-to-head offset RMS %.1f mm', sqrt(mean(off.^2)));
+r = run_task('track_gaze', 8);
+setenv('RIG_FACE_STUB', ''); setenv('RIG_DET_METHOD', ''); setenv('RIG_GZF', '0');
+assert(isfield(r, 'gz') && any(strcmp(r.gz.phase, {'run', 'off'})), 'track_gaze: zeroing did not finish');
+x = r.L.y(~isnan(r.L.y))*r.M.r;
+assert(all(x > r.P.belt.xMin - 0.005 & x < r.P.belt.xMax + 0.005), 'track_gaze: carriage outside the limits');
+fprintf('track_face / track_gaze ok\n');
 end
 
 function r = run_task(task, trun)

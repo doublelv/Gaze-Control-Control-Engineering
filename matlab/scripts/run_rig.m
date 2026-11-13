@@ -16,7 +16,10 @@
 %                            run as in track_camera (they only load the loop, the
 %                            carriage follows the square wave) -> step response with
 %                            the real loop time
-%   TASK = 'track_camera'    homing, then follow the user's head with the camera
+%   TASK = 'track_face'      follow the face only (head position; eye direction ignored)
+%   TASK = 'track_gaze'      follow the gaze only: the camera starts at the rail centre and
+%                            moves only by the eye angle psi (look at the camera for 2 s first)
+%   TASK = 'track_camera'    face AND gaze (same as 'track_both'):
 %                            (P.trk.source: 'both' = eyes inside the face, else the
 %                            face), aim the servo LEDs at the eyes, all LEDs in
 %                            P.led.on switched on, gaze point if calibrated;
@@ -184,8 +187,13 @@ end
 %% ------------------------------------------------------------ tracking
 n = round(TRUN/P.Ts);
 t = (0:n-1)*P.Ts;
-useCam = any(strcmp(TASK, {'track_camera', 'step_camera'}));
-followCam = strcmp(TASK, 'track_camera');       % step_camera: camera only loads the loop
+trackTasks = {'track_camera', 'track_both', 'track_face', 'track_gaze'};
+useCam = any(strcmp(TASK, [trackTasks, {'step_camera'}]));
+followCam = any(strcmp(TASK, trackTasks));      % step_camera: camera only loads the loop
+trkMode = 'both';                                % what the carriage follows: 'face' | 'gaze' | 'both'
+if strcmp(TASK, 'track_face'), trkMode = 'face'; P.gzf.on = false; end
+if strcmp(TASK, 'track_gaze'), trkMode = 'gaze'; P.gzf.on = true; end
+if any(strcmp(TASK, {'track_camera', 'track_both'})) && isempty(getenv('RIG_GZF')), P.gzf.on = true; end
 if strcmp(TASK, 'track_synthetic')
     Rref = coordinator_setpoints(P, t);          % simulated head path
 end
@@ -208,6 +216,10 @@ if useCam
     fprintf('Following: %s (P.trk.source)\n', P.trk.source);
     trkSrc = 'none';
     gz = [];                                     % gaze follow state (P.gzf, gaze_follow.m)
+    xBase = 0.5*(P.belt.xMin + P.belt.xMax);     % track_gaze: the camera moves from here by the eye angle only
+    if strcmp(trkMode, 'gaze'), P.gzf.xBase = xBase; else, P.gzf.xBase = NaN; end
+    if strcmp(trkMode, 'both') && ~P.gzf.on, trkMode = 'face'; end
+    fprintf('Carriage follows: %s\n', pick(strcmp(trkMode, 'both'), 'FACE + GAZE', upper(trkMode)));
     if followCam && P.gzf.on
         fprintf(['Gaze follow ON: look AT THE CAMERA for the first ~2 s (zeroing).\n', ...
                  '  Then look left or right: the camera moves that way and stops when you look at it.\n']);
@@ -307,8 +319,11 @@ for k = 1:n
                 elseif ~followCam
                     % keep the step reference
                 elseif ~any(isnan(pHat)) && trackOk
-                    refNew = refs_from_eye(P, pHat);
-                    if P.gzf.on && ~isnan(gzDeg)   % camera toward where the eyes look
+                    refNew = refs_from_eye(P, pHat);   % face: carriage in front of the head
+                    if strcmp(trkMode, 'gaze')       % gaze only: rail centre + eye angle
+                        xg = xBase; if ~isnan(gzDeg), xg = xBase + H.z*tand(gzDeg); end
+                        refNew(1) = min(max(xg, P.belt.xMin), P.belt.xMax)/M.r;
+                    elseif strcmp(trkMode, 'both') && ~isnan(gzDeg)   % face + gaze
                         xg = pHat(1) + H.z*tand(gzDeg);
                         refNew(1) = min(max(xg, P.belt.xMin), P.belt.xMax)/M.r;
                     end
