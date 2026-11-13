@@ -222,7 +222,7 @@ if useCam
     fprintf('Carriage follows: %s\n', pick(strcmp(trkMode, 'both'), 'FACE + GAZE', upper(trkMode)));
     if followCam && P.gzf.on
         fprintf(['Gaze follow ON: look AT THE CAMERA for the first ~2 s (zeroing).\n', ...
-                 '  Then look left or right: the camera moves that way and stops when you look at it.\n']);
+                 '  Then look at a point on the rail: the camera goes there (it looks again each time it stops).\n']);
     end
 end
 if SHOW && useCam, V = viz_live_init(P, sprintf('run_rig %s (%s)', TASK, MODE)); end
@@ -309,7 +309,8 @@ for k = 1:n
                 % gaze follow: iris position inside the face box -> where the eyes look
                 gzDeg = NaN;
                 if followCam
-                    [gz, gzDeg] = gaze_follow(gz, obs, fbox, H, xCam, tFrame, strcmp(trkSrc, 'eyes'), P);
+                    settled = abs(refPrev - y)*M.r < P.gzf.settleMm*1e-3 && abs(refNow(1) - refPrev)*M.r < P.gzf.settleMm*1e-3;
+                    [gz, gzDeg] = gaze_follow(gz, obs, fbox, H, xCam, tFrame, strcmp(trkSrc, 'eyes'), P, settled);
                     L.gazeDeg(k) = gzDeg; L.gazeM(k) = gz.m; L.gazePhi(k) = gz.phi;
                 end
                 L.glints(k) = sum(arrayfun(@(x) size(x.glints, 1) > 0, det.eyes));

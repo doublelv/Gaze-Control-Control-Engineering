@@ -61,15 +61,15 @@ target is still and the error is below 0.3 mm (`P.trk.holdBand`), and on again a
 (`P.trk.holdExit`). Until 2026-11-09 the band was 3 mm without hysteresis; the motor then stopped
 0.7-2.6 mm short of a 50 mm step, because the integrator does not act while the motor is off.
 
-Gaze follow (`gaze_follow.m`, `P.gzf`, track_camera): visual servoing on the iris. After a 2 s
-zeroing (user looks at the camera) the iris offset inside the face box gives the eye angle relative
-to the camera, $m = \arcsin(d/r_{eye})$. The camera angle $\psi$ integrates it,
-$\dot\psi = K_i\,\mathrm{dz}(m + B_c(\varphi - \varphi_0))$ ($K_i$ 1.5 s$^{-1}$, dead zone 5 deg,
-$B_c$ 0.5), and the carriage reference is $x_{head} + z\tan\psi$: the camera moves toward the side the
-eyes look at and stops when they look at it again. The camera's own motion reduces $m$
-(negative feedback), so no calibration is needed. History: a direct $x_{head} + z\tan m$ (no
-integrator) ran away on the rig on 2026-11-10, and a start-up calibration of the camera effect
-failed on the rig ($R^2 < 0$). Safety: 4 left-right swings in 4 s switch gaze follow off.
+Gaze follow (`gaze_follow.m`, `P.gzf`): TASK `track_face` = head only, `track_gaze` = rail centre +
+gaze, `track_camera` = head + gaze (reference $x_{base} + z\tan\theta$). After a 2 s zeroing (look at
+the camera) the gaze angle from straight ahead is $\theta = m + \varphi$, with $m = \arcsin(d/r_{eye})$
+the eye angle relative to the camera and $\varphi$ the angle of the line to the camera. Look, then
+move: $\theta$ is measured (median of 5 frames) only while the carriage stands; the target moves by
+0.6 of the difference when it exceeds 4 deg. If the face box adds an extra shift (total factor $B$
+instead of 1), the camera settles at $\theta/B$; each look shrinks the error by $1 - 0.6B$, so there is
+no left-right swinging for $0 < B < 3.3$. History: a continuous direct version ran away (2026-11-10), a
+start-up calibration of $B$ failed ($R^2 < 0$), an integrating version ran to the rail ends (2026-11-13).
 Servo LED angles are low-passed (0.3 s) with a 1.5 deg dead band (`P.srv.tauAim`, `deadAim`).
 
 ## 3. Reference generation (MIMO coordinator, `refs_from_eye.m`)
