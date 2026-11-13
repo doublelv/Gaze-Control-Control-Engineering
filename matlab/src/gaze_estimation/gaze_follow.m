@@ -73,8 +73,10 @@ switch gz.phase
             gz.psi = gz.psi*max(0, 1 - dt/G.lostTau); % eyes gone: back to the head
         end
         % stay on the rail (no wind-up) and within the angle limit
-        if isfinite(H.z) && ~isnan(H.pos(1))
-            lo = atand((P.belt.xMin - H.pos(1))/H.z); hi = atand((P.belt.xMax - H.pos(1))/H.z);
+        xb = H.pos(1);                            % the carriage moves from the head ...
+        if isfield(G, 'xBase') && ~isnan(G.xBase), xb = G.xBase; end   % ... or from a fixed base (track_gaze)
+        if isfinite(H.z) && ~isnan(xb)
+            lo = atand((P.belt.xMin - xb)/H.z); hi = atand((P.belt.xMax - xb)/H.z);
             gz.psi = min(max(gz.psi, lo), hi);
         end
         gz.psi = min(max(gz.psi, -G.maxDeg), G.maxDeg);

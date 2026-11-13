@@ -313,6 +313,7 @@ P.trk.Vlim      = 6;        % camera tasks: motor voltage limit [V] (PSU 12 V). 
 %  own motion changes the apparent eye angle, ~1.9x); a start-up calibration of that
 %  factor failed on the rig (R^2 < 0). The integrating form needs no calibration.
 P.gzf.on        = true;     % false: follow the head only
+P.gzf.xBase     = NaN;      % set by run_rig for TASK = 'track_gaze' (carriage base = rail centre)
 P.gzf.tZero     = 2.0;      % zeroing: look at the camera this long [s]
 P.gzf.minSamples= 10;       % frames needed for the zeroing
 P.gzf.rEye      = 0.011;    % eyeball centre to iris centre [m] (eye models: ~10-11 mm)
